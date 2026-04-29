@@ -51,7 +51,6 @@
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>joint_state_publisher</build_depend>
   <build_depend>joint_state_publisher_gui</build_depend>
-  <build_depend>kinova_description</build_depend>
   <build_depend>moveit_planners_ompl</build_depend>
   <build_depend>moveit_ros_move_group</build_depend>
   <build_depend>moveit_ros_visualization</build_depend>
@@ -59,7 +58,6 @@
   <build_depend>xacro</build_depend>
   <build_export_depend>joint_state_publisher</build_export_depend>
   <build_export_depend>joint_state_publisher_gui</build_export_depend>
-  <build_export_depend>kinova_description</build_export_depend>
   <build_export_depend>moveit_planners_ompl</build_export_depend>
   <build_export_depend>moveit_ros_move_group</build_export_depend>
   <build_export_depend>moveit_ros_visualization</build_export_depend>
@@ -67,7 +65,6 @@
   <build_export_depend>xacro</build_export_depend>
   <exec_depend>joint_state_publisher</exec_depend>
   <exec_depend>joint_state_publisher_gui</exec_depend>
-  <exec_depend>kinova_description</exec_depend>
   <exec_depend>moveit_planners_ompl</exec_depend>
   <exec_depend>moveit_ros_move_group</exec_depend>
   <exec_depend>moveit_ros_visualization</exec_depend>

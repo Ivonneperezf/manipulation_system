@@ -10,7 +10,7 @@ project(moveit_config)
 find_package(catkin REQUIRED COMPONENTS
   joint_state_publisher
   joint_state_publisher_gui
-  kinova_description
+  
   moveit_planners_ompl
   moveit_ros_move_group
   moveit_ros_visualization
@@ -110,7 +110,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES moveit_config
-#  CATKIN_DEPENDS joint_state_publisher joint_state_publisher_gui kinova_description moveit_planners_ompl moveit_ros_move_group moveit_ros_visualization robot_state_publisher xacro
+#  CATKIN_DEPENDS joint_state_publisher joint_state_publisher_gui  moveit_planners_ompl moveit_ros_move_group moveit_ros_visualization robot_state_publisher xacro
 #  DEPENDS system_lib
 )
 
