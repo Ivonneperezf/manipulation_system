@@ -3,13 +3,13 @@
       <arg name="py_path" default="python3" />
 
     <node name="segmentation_node" 
-          pkg="sim_kinova" 
+          pkg="statemachine" 
           type="segmentation_node_gazebo.py" 
           output="screen"
           launch-prefix="$(arg py_path)" />
     
     <node name="transformer_node"
-          pkg="sim_kinova"
+          pkg="statemachine"
           type="transformer_node_gazebo.py"
           output="screen" />
 </launch>
