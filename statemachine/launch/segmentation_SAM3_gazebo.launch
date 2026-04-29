@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="py_path" default="python3" />
+
+        <node name="segmentation_node" 
+            pkg="statemachine" 
+            type="segmentation_sam3.py" 
+            output="screen"
+            launch-prefix="$(arg py_path)" />
+</launch>
