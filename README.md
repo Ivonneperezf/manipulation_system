@@ -9,3 +9,9 @@ Los comandos se indican a continuación:
 ``` bash
 roslaunch gazebo_sim gazebo_kinova_sim.launch
 ```
+
+### Comando para lanzar Rviz
+
+``` bash
+roslaunch gazebo_sim rviz_kinova_sim.launch
+```
