@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="moveit_ros_move_group"
+          type="move_group"
+          name="move_group"
+          output="screen">
+        <remap from="/joint_states" to="/m1n6s300/joint_states"/>
+    </node>
+
+    <node name="kinova_move"
+          pkg="sim_kinova"
+          type="move_node.py"
+          output="screen">
+          <remap from="/joint_states" to="/m1n6s300/joint_states"/>
+    </node>
+</launch>

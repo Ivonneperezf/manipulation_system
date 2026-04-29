@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<launch>
+      <arg name="py_path" default="python3" />
+
+    <node name="segmentation_node" 
+          pkg="sim_kinova" 
+          type="segmentation_node_gazebo.py" 
+          output="screen"
+          launch-prefix="$(arg py_path)" />
+    
+    <node name="transformer_node"
+          pkg="sim_kinova"
+          type="transformer_node_gazebo.py"
+          output="screen" />
+</launch>

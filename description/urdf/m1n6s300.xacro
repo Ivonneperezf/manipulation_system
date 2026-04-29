@@ -1,0 +1,251 @@
+<?xml version="1.0"?>
+<!-- m1_6n refers to mico v1 6DOF non-spherical -->
+
+
+<root xmlns:xi="http://www.w3.org/2001/XInclude"
+    xmlns:gazebo="http://playerstage.sourceforge.net/gazebo/xmlschema/#gz"
+    xmlns:model="http://playerstage.sourceforge.net/gazebo/xmlschema/#model"
+    xmlns:sensor="http://playerstage.sourceforge.net/gazebo/xmlschema/#sensor"
+    xmlns:body="http://playerstage.sourceforge.net/gazebo/xmlschema/#body"
+    xmlns:geom="http://playerstage.sourceforge.net/gazebo/xmlschema/#geom"
+    xmlns:joint="http://playerstage.sourceforge.net/gazebo/xmlschema/#joint"
+    xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
+    xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
+    xmlns:rendering="http://playerstage.sourceforge.net/gazebo/xmlschema/#rendering"
+    xmlns:renderable="http://playerstage.sourceforge.net/gazebo/xmlschema/#renderable"
+    xmlns:physics="http://playerstage.sourceforge.net/gazebo/xmlschema/#physics"
+    xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <xacro:include filename="$(find description)/urdf/kinova_common.xacro" />
+    <xacro:include filename="$(find description)/urdf/kinova_finger_set.xacro" />
+
+    <!-- Import all Gazebo-customization elements -->
+    <xacro:include filename="$(find description)/urdf/kinova.gazebo" />
+    <!-- incluir archivo para la camara -->
+    <!-- <xacro:include filename="$(find realsense2_description)/urdf/_d415.urdf.xacro"/> -->
+
+    <xacro:property name="link_base_mesh" value="base" />
+    <xacro:property name="link_1_mesh" value="shoulder" />
+    <xacro:property name="link_2_mesh" value="arm_mico" />
+    <xacro:property name="link_3_mesh" value="forearm_mico" />
+    <xacro:property name="link_4_mesh" value="wrist" />
+    <xacro:property name="link_5_mesh" value="wrist" />
+    <xacro:property name="link_6_mesh" value="hand_3finger" />
+
+    <!--Used for conditional arguments for setting inertial parameters
+        base 0, shoulder 1, arm 2, forearm 3, wrist 4, arm_mico 5,
+        arm_half1 (7dof)	6, arm_half2 (7dof) 7, wrist_spherical_1  8, wrist_spherical_2  9
+        fore_arm_mico 10,
+        hand 3 finger 55, hand_2finger 56, finger_proximal 57, finger_distal 58
+    -->
+    <xacro:property name="link_base_mesh_no" value="0" />
+    <xacro:property name="link_1_mesh_no" value="1" />
+    <xacro:property name="link_2_mesh_no" value="5" />
+    <xacro:property name="link_3_mesh_no" value="10" />
+    <xacro:property name="link_4_mesh_no" value="4" />
+    <xacro:property name="link_5_mesh_no" value="4" />
+    <xacro:property name="link_6_mesh_no" value="55" />
+
+    <xacro:property name="joint_base" value="joint_base" />
+    <xacro:property name="joint_base_type" value="fixed" />
+    <xacro:property name="joint_base_axis_xyz" value="0 0 0" />
+    <xacro:property name="joint_base_origin_xyz" value="0 0 0" />
+    <xacro:property name="joint_base_origin_rpy" value="0 0 0" />
+
+    <xacro:property name="joint_1" value="joint_1" />
+    <xacro:property name="joint_1_type" value="continuous" />
+    <xacro:property name="joint_1_axis_xyz" value="0 0 1" />
+    <xacro:property name="joint_1_origin_xyz" value="0 0 0.15675" />
+    <xacro:property name="joint_1_origin_rpy" value="0 ${J_PI} 0" />
+    <xacro:property name="joint_1_lower_limit" value="${-2*J_PI}" />
+    <xacro:property name="joint_1_upper_limit" value="${2*J_PI}" />
+    <xacro:property name="joint_1_velocity_limit" value="${36*J_PI/180}" />
+    <xacro:property name="joint_1_torque_limit" value="40" />
+
+    <xacro:property name="joint_2" value="joint_2" />
+    <xacro:property name="joint_2_type" value="revolute" />
+    <xacro:property name="joint_2_axis_xyz" value="0 0 1" />
+    <xacro:property name="joint_2_origin_xyz" value="0 0.0016 -0.11875" />
+    <xacro:property name="joint_2_origin_rpy" value="${-J_PI/2} 0 ${J_PI}" />
+    <!-- <xacro:property name="joint_2_lower_limit" value="${50/180*J_PI}" />
+    <xacro:property name="joint_2_upper_limit" value="${310/180*J_PI}" /> -->
+    <xacro:property name="joint_2_lower_limit" value="${151/180*J_PI}" />
+    <xacro:property name="joint_2_upper_limit" value="${299/180*J_PI}" />
+    <xacro:property name="joint_2_velocity_limit" value="${36*J_PI/180}" />
+    <xacro:property name="joint_2_torque_limit" value="80" />
+
+    <xacro:property name="joint_3" value="joint_3" />
+    <xacro:property name="joint_3_type" value="revolute" />
+    <xacro:property name="joint_3_axis_xyz" value="0 0 1" />
+    <xacro:property name="joint_3_origin_xyz" value="0 -0.290 0" />
+    <xacro:property name="joint_3_origin_rpy" value="0 ${J_PI} 0" />
+    <!-- <xacro:property name="joint_3_lower_limit" value="${35/180*J_PI}" />
+    <xacro:property name="joint_3_upper_limit" value="${325/180*J_PI}" /> -->
+    <xacro:property name="joint_3_lower_limit" value="${52/180*J_PI}" />
+    <xacro:property name="joint_3_upper_limit" value="${196/180*J_PI}" />
+    <xacro:property name="joint_3_velocity_limit" value="${36*J_PI/180}" />
+    <xacro:property name="joint_3_torque_limit" value="40" />
+
+    <xacro:property name="joint_4" value="joint_4" />
+    <xacro:property name="joint_4_type" value="continuous" />
+    <xacro:property name="joint_4_axis_xyz" value="0 0 1" />
+    <xacro:property name="joint_4_origin_xyz" value="0 0.1231 -0.0086" />
+    <xacro:property name="joint_4_origin_rpy" value="${-J_PI/2} 0 ${J_PI}" />
+    <xacro:property name="joint_4_lower_limit" value="${-2*J_PI}" />
+    <xacro:property name="joint_4_upper_limit" value="${2*J_PI}" />
+    <xacro:property name="joint_4_velocity_limit" value="${48*J_PI/180}" />
+    <xacro:property name="joint_4_torque_limit" value="20" />
+
+    <xacro:property name="joint_5" value="joint_5" />
+    <xacro:property name="joint_5_type" value="continuous" />
+    <xacro:property name="joint_5_axis_xyz" value="0 0 1" />
+    <xacro:property name="joint_5_origin_xyz" value="0 -0.03703 -0.06414" />
+    <xacro:property name="joint_5_origin_rpy" value="${J_PI/3} 0 ${J_PI}" />
+    <xacro:property name="joint_5_lower_limit" value="${-2*J_PI}" />
+    <xacro:property name="joint_5_upper_limit" value="${2*J_PI}" />
+    <xacro:property name="joint_5_velocity_limit" value="${48*J_PI/180}" />
+    <xacro:property name="joint_5_torque_limit" value="20" />
+
+    <xacro:property name="joint_6" value="joint_6" />
+    <xacro:property name="joint_6_type" value="continuous" />
+    <xacro:property name="joint_6_axis_xyz" value="0 0 1" />
+    <xacro:property name="joint_6_origin_xyz" value="0 -0.03703 -0.06414" />
+    <xacro:property name="joint_6_origin_rpy" value="${J_PI/3} 0 ${J_PI}" />
+    <xacro:property name="joint_6_lower_limit" value="${-2*J_PI}" />
+    <xacro:property name="joint_6_upper_limit" value="${2*J_PI}" />
+    <xacro:property name="joint_6_velocity_limit" value="${48*J_PI/180}" />
+    <xacro:property name="joint_6_torque_limit" value="20" />
+
+    <xacro:property name="joint_end_effector" value="end_effector_offset" />
+    <xacro:property name="joint_end_effector_type" value="fixed" />
+    <xacro:property name="joint_end_effector_axis_xyz" value="0 0 0" />
+    <xacro:property name="joint_end_effector_origin_xyz" value="0 0 -0.1600" />
+    <xacro:property name="joint_end_effector_origin_rpy" value="${J_PI} 0 ${J_PI/2}" />
+
+
+
+    <xacro:macro name="m1n6s300" params="base_parent prefix:=m1n6s300">
+
+        <xacro:gazebo_config robot_namespace="${prefix}"/>
+
+        <xacro:kinova_armlink link_name="${prefix}_link_base" link_mesh="${link_base_mesh}" mesh_no="${link_base_mesh_no}"/>
+        <xacro:kinova_armjoint joint_name="${prefix}_joint_base" type="${joint_base_type}" parent="${base_parent}" child="${prefix}_link_base" joint_axis_xyz="${joint_base_axis_xyz}" joint_origin_xyz="${joint_base_origin_xyz}" joint_origin_rpy="${joint_base_origin_rpy}" joint_lower_limit="0" joint_upper_limit="0" joint_velocity_limit="0" joint_torque_limit="0" fixed="true"/>
+
+        <xacro:kinova_armlink link_name="${prefix}_link_1" link_mesh="${link_1_mesh}" use_ring_mesh="true" mesh_no="${link_1_mesh_no}"/>
+        <xacro:kinova_armjoint joint_name="${prefix}_joint_1" type="${joint_1_type}" parent="${prefix}_link_base" child="${prefix}_link_1" joint_axis_xyz="${joint_1_axis_xyz}" joint_origin_xyz="${joint_1_origin_xyz}" joint_origin_rpy="${joint_1_origin_rpy}" joint_lower_limit="${joint_1_lower_limit}" joint_upper_limit="${joint_1_upper_limit}" joint_velocity_limit="${joint_1_velocity_limit}" joint_torque_limit="${joint_1_torque_limit}"/>
+
+        <xacro:kinova_armlink link_name="${prefix}_link_2" link_mesh="${link_2_mesh}" use_ring_mesh="true" mesh_no="${link_2_mesh_no}"/>
+        <xacro:kinova_armjoint joint_name="${prefix}_joint_2" type="${joint_2_type}" parent="${prefix}_link_1" child="${prefix}_link_2" joint_axis_xyz="${joint_2_axis_xyz}" joint_origin_xyz="${joint_2_origin_xyz}" joint_origin_rpy="${joint_2_origin_rpy}" joint_lower_limit="${joint_2_lower_limit}" joint_upper_limit="${joint_2_upper_limit}" joint_velocity_limit="${joint_2_velocity_limit}" joint_torque_limit="${joint_2_torque_limit}"/>
+
+        <xacro:kinova_armlink link_name="${prefix}_link_3" link_mesh="${link_3_mesh}" use_ring_mesh="true" mesh_no="${link_3_mesh_no}"/>
+        <xacro:kinova_armjoint joint_name="${prefix}_joint_3" type="${joint_3_type}" parent="${prefix}_link_2" child="${prefix}_link_3" joint_axis_xyz="${joint_3_axis_xyz}" joint_origin_xyz="${joint_3_origin_xyz}" joint_origin_rpy="${joint_3_origin_rpy}" joint_lower_limit="${joint_3_lower_limit}" joint_upper_limit="${joint_3_upper_limit}" joint_velocity_limit="${joint_3_velocity_limit}" joint_torque_limit="${joint_3_torque_limit}"/>
+
+        <xacro:kinova_armlink link_name="${prefix}_link_4" link_mesh="${link_4_mesh}" use_ring_mesh="true" ring_mesh="ring_small" mesh_no="${link_4_mesh_no}"/>
+        <xacro:kinova_armjoint joint_name="${prefix}_joint_4" type="${joint_4_type}" parent="${prefix}_link_3" child="${prefix}_link_4" joint_axis_xyz="${joint_4_axis_xyz}" joint_origin_xyz="${joint_4_origin_xyz}" joint_origin_rpy="${joint_4_origin_rpy}" joint_lower_limit="${joint_4_lower_limit}" joint_upper_limit="${joint_4_upper_limit}" joint_velocity_limit="${joint_4_velocity_limit}" joint_torque_limit="${joint_4_torque_limit}"/>
+
+        <xacro:kinova_armlink link_name="${prefix}_link_5" link_mesh="${link_5_mesh}" use_ring_mesh="true" ring_mesh="ring_small" mesh_no="${link_5_mesh_no}"/>
+        <xacro:kinova_armjoint joint_name="${prefix}_joint_5" type="${joint_5_type}" parent="${prefix}_link_4" child="${prefix}_link_5" joint_axis_xyz="${joint_5_axis_xyz}" joint_origin_xyz="${joint_5_origin_xyz}" joint_origin_rpy="${joint_5_origin_rpy}" joint_lower_limit="${joint_5_lower_limit}" joint_upper_limit="${joint_5_upper_limit}" joint_velocity_limit="${joint_5_velocity_limit}" joint_torque_limit="${joint_5_torque_limit}"/>
+
+        <xacro:kinova_armlink link_name="${prefix}_link_6" link_mesh="${link_6_mesh}" use_ring_mesh="true" ring_mesh="ring_small" mesh_no="${link_6_mesh_no}"/>
+        <xacro:kinova_armjoint joint_name="${prefix}_joint_6" type="${joint_6_type}" parent="${prefix}_link_5" child="${prefix}_link_6" joint_axis_xyz="${joint_6_axis_xyz}" joint_origin_xyz="${joint_6_origin_xyz}" joint_origin_rpy="${joint_6_origin_rpy}" joint_lower_limit="${joint_6_lower_limit}" joint_upper_limit="${joint_6_upper_limit}" joint_velocity_limit="${joint_6_velocity_limit}" joint_torque_limit="${joint_6_torque_limit}"/>
+
+        <xacro:kinova_virtual_link link_name="${prefix}_end_effector"/>
+        <xacro:kinova_virtual_joint joint_name="${prefix}_joint_end_effector" type="${joint_end_effector_type}" parent="${prefix}_link_6" child="${prefix}_end_effector" joint_axis_xyz="${joint_end_effector_axis_xyz}" joint_origin_xyz="${joint_end_effector_origin_xyz}" joint_origin_rpy="${joint_end_effector_origin_rpy}" joint_lower_limit="0" joint_upper_limit="0"/>
+
+        <!-- Montura de la camara en la quinta articulación del brazo -->
+
+        <link name="${prefix}_d415_mount_link"/>
+
+        <joint name="${prefix}_d415_mount_joint" type="fixed">
+            <parent link="${prefix}_link_5"/>
+            <!-- <parent link="${prefix}_link_6"/> -->
+            <child link="${prefix}_d415_mount_link"/>
+            <origin xyz="0.000 -0.129 0.004" rpy="3.142 0.524 -1.571"/>
+            <!-- <origin xyz="0.0 0.105 -0.045" rpy="1.5708 3.1416 0.0"/> -->
+        </joint>
+
+        <xacro:sensor_d415
+            parent="${prefix}_d415_mount_link"
+            name="d415"
+            use_nominal_extrinsics="true">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:sensor_d415>
+
+        <!-- Definición de tópicos-->
+
+        <!-- Color camera -->
+        <gazebo reference="d415_color_frame">
+            <sensor type="camera" name="d415_color">
+                <update_rate>30.0</update_rate>
+                <camera name="d415_color">
+                    <horizontal_fov>1.2043</horizontal_fov>
+                    <image>
+                        <width>640</width>
+                        <height>480</height>
+                        <format>R8G8B8</format>
+                    </image>
+                    <clip>
+                        <near>0.1</near>
+                        <far>10.0</far>
+                    </clip>
+                </camera>
+                <plugin name="d415_color_controller" filename="libgazebo_ros_camera.so">
+                    <alwaysOn>true</alwaysOn>
+                    <updateRate>30.0</updateRate>
+                    <cameraName>d415/color</cameraName>
+                    <imageTopicName>image_raw</imageTopicName>
+                    <cameraInfoTopicName>camera_info</cameraInfoTopicName>
+                    <frameName>d415_color_optical_frame</frameName>
+                    <hackBaseline>0.0</hackBaseline>
+                    <distortionK1>0.0</distortionK1>
+                    <distortionK2>0.0</distortionK2>
+                    <distortionK3>0.0</distortionK3>
+                    <distortionT1>0.0</distortionT1>
+                    <distortionT2>0.0</distortionT2>
+                </plugin>
+            </sensor>
+        </gazebo>
+
+        <!-- Depth camera -->
+        <gazebo reference="d415_depth_frame">
+            <sensor type="depth" name="d415_depth">
+                <update_rate>30.0</update_rate>
+                <camera name="d415_depth">
+                    <horizontal_fov>1.2043</horizontal_fov>
+                    <image>
+                        <width>640</width>
+                        <height>480</height>
+                        <format>R8G8B8</format>
+                    </image>
+                    <clip>
+                        <near>0.1</near>
+                        <far>10.0</far>
+                    </clip>
+                </camera>
+                <plugin name="d415_depth_controller" filename="libgazebo_ros_openni_kinect.so">
+                    <alwaysOn>true</alwaysOn>
+                    <updateRate>30.0</updateRate>
+                    <cameraName>d415</cameraName>
+                    <imageTopicName>depth/image_raw</imageTopicName>
+                    <cameraInfoTopicName>depth/camera_info</cameraInfoTopicName>
+                    <depthImageTopicName>depth/image_raw</depthImageTopicName>
+                    <depthImageCameraInfoTopicName>depth/camera_info</depthImageCameraInfoTopicName>
+                    <pointCloudTopicName>depth/points</pointCloudTopicName>
+                    <frameName>d415_depth_optical_frame</frameName>
+                    <pointCloudCutoff>0.1</pointCloudCutoff>
+                    <pointCloudCutoffMax>10.0</pointCloudCutoffMax>
+                    <distortionK1>0.0</distortionK1>
+                    <distortionK2>0.0</distortionK2>
+                    <distortionK3>0.0</distortionK3>
+                    <distortionT1>0.0</distortionT1>
+                    <distortionT2>0.0</distortionT2>
+                </plugin>
+            </sensor>
+        </gazebo>
+
+    <xacro:kinova_3fingers link_hand="${prefix}_link_6" prefix="${prefix}_"/>
+    </xacro:macro>
+
+
+
+</root>
