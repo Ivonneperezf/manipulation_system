@@ -2,16 +2,36 @@
 
 En este repositorio ya estan integrados todos los archivos para realizar la simulacion usando Gazebo, ademas incluye la montura de la cámara en la muñeca del mismo.
 
+## Comandos para simulación 
+
 Los comandos se indican a continuación:
 
-### Comando para lanzar Gazebo
+#### Comando para lanzar Gazebo
 
 ``` bash
 roslaunch gazebo_sim gazebo_kinova_sim.launch
 ```
 
-### Comando para lanzar Rviz
+#### Comando para lanzar Rviz
 
 ``` bash
 roslaunch gazebo_sim rviz_kinova_sim.launch
+```
+
+#### Comando para lanzar nodo de movimiento
+
+``` bash
+roslaunch statemachine move_node_gazebo.launch
+```
+
+#### Comando para lanzar segmentacion
+
+``` bash
+roslaunch statemachine segmentation_gazebo.launch
+```
+
+#### Comando para lanzar maquina de estados
+
+``` bash
+roslaunch statemachine statemachine_node_gazebo.launch
 ```
