@@ -8,9 +8,14 @@
     </node>
 
     <node name="kinova_move"
-          pkg="sim_kinova"
+          pkg="statemachine"
           type="move_node.py"
           output="screen">
           <remap from="/joint_states" to="/m1n6s300/joint_states"/>
     </node>
+
+    <node name="transformer_node"
+          pkg="statemachine"
+          type="transformer_node_gazebo.py"
+          output="screen" />
 </launch>

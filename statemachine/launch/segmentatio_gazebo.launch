@@ -8,8 +8,8 @@
           output="screen"
           launch-prefix="$(arg py_path)" />
     
-    <node name="transformer_node"
+    <!-- <node name="transformer_node"
           pkg="statemachine"
           type="transformer_node_gazebo.py"
-          output="screen" />
+          output="screen" /> -->
 </launch>
