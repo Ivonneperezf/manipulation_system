@@ -36,6 +36,8 @@ roslaunch statemachine segmentation_gazebo.launch
 roslaunch statemachine statemachine_node_gazebo.launch
 ```
 
+## Especificaciones para el brazo fisico
+
 Los archivos de Moveit! sirven para la implementación del brazo fisico, aunque ya existen algunos elementos que deben de ajustarse.
 
 Las pruebas para ver SAM3 se deben de lanzar mediante el siguiente ccomando:
