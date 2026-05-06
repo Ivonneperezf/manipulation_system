@@ -4,9 +4,10 @@ import ros_numpy
 import numpy as np
 import cv2
 import rospkg
-from sensor_msgs.msg import Image, CameraInfo
+from sensor_msgs.msg import Image, CameraInfo, PointCloud2
 from geometry_msgs.msg import PointStamped
 from ultralytics.models.sam import SAM3SemanticPredictor
+import sensor_msgs.point_cloud2 as pc2
 
 class KinovaVisionSAM3:
     def __init__(self):
@@ -16,9 +17,9 @@ class KinovaVisionSAM3:
         self.pub = rospy.Publisher('object_centroid', PointStamped, queue_size=10)
 
         #Tópicos fijos de la RealSense D415
-        self.TOPIC_RGB = "/d415/color/image_raw"
-        #self.TOPIC_DEPTH = "/d415/aligned_depth_to_color/image_raw"
-        self.TOPIC_INFO = "/d415/color/camera_info"
+        self.TOPIC_RGB    = rospy.get_param("~topics/rgb_topic", "/d415/color/image_raw")
+        self.TOPIC_INFO   = rospy.get_param("~topics/camera_info_topic", "/d415/color/camera_info")
+        self.TOPIC_POINTS = rospy.get_param("~topics/points_topic", "/d415/depth/points")
         
         # Flag para evitar que los callbacks se acumulen (Control de Concurrencia)
         self.is_processing = False 
@@ -28,7 +29,7 @@ class KinovaVisionSAM3:
         # Obtener ruta del modelo dinámicamente
         rp = rospkg.RosPack()
         try:
-            package_path = rp.get_path('sam_segmentation')
+            package_path = rp.get_path(rospy.get_param("~paths/pack", 'statemachine'))
             model_path = package_path + "/weights/sam3.pt"
         except Exception as e:
             rospy.logwarn(f"No se encontró el paquete: {e}. Usando ruta local.")
@@ -37,13 +38,7 @@ class KinovaVisionSAM3:
         rospy.loginfo(f"Cargando pesos desde: {model_path}")
         
         # Configuración de SAM3 (Promptable Concept Segmentation)
-        overrides = dict(
-            conf=0.35,      # Umbral de confianza
-            task="segment",
-            mode="predict",
-            model=model_path,
-            half=True,      # Usa FP16 para mayor velocidad en GPUs NVIDIA
-        )
+        overrides = dict(conf=0.35, task="segment", mode="predict", model=model_path, half=True,)
         
         # Inicialización del predictor
         try:
@@ -66,22 +61,60 @@ class KinovaVisionSAM3:
             rospy.logerr("No se detectó la cámara D415. Revisa los tópicos.")
             return
 
-        self.last_depth = None 
+        # Variable para la nube de puntos
+        self.last_cloud = None
 
-        #Estado y Suscriptores
-        self.last_depth = None # Variable para almacenar la última imagen de profundidad recibida, necesaria para sincronizar con el RGB
-        #rospy.Subscriber(self.TOPIC_DEPTH, Image, self.depth_cb) # Suscripción a la imagen de profundidad alineada con el color, sin cola para procesar cada frame de profundidad que llega
-        rospy.Subscriber(self.TOPIC_RGB, Image, self.rgb_cb, queue_size=1, buff_size=2**24) # Suscripción a la imagen RGB con cola de tamaño 1 para no saturar la memoria si el procesamiento es lento
+        rospy.Subscriber(self.TOPIC_POINTS, PointCloud2, self.cloud_cb, queue_size=1)
+        rospy.Subscriber(self.TOPIC_RGB, Image, self.rgb_cb, queue_size=1, buff_size=2**24)
         
         rospy.loginfo("Nodo SAM3 listo y procesando...")
 
-    def depth_cb(self, msg): 
-        # Convertimos la profundidad a numpy una sola vez
-        self.last_depth = ros_numpy.numpify(msg) 
+    # Callback de nube de puntos
+    def cloud_cb(self, msg):
+        # Lee los puntos x, y y z, ignorando los valores nulos
+        puntos = list(pc2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True))
+        # Si hay puntos validos los guarda en un array de atributo de clase
+        if len(puntos) > 0:
+            self.last_cloud = np.array(puntos, dtype=np.float32)
+
+    # Funcion para obtener la profundidad promedio dentro de la mascara de SAM
+    def get_depth_from_mask(self, mask):
+        # Si no hay nube de puntos, retornamos 0.0 como indicador de fallo
+        if self.last_cloud is None:
+            return 0.0
+
+        mask_h, mask_w = mask.shape # Obtenemos dimensiones de la mascara
+        points_3d = self.last_cloud # Obtenemos la nube de puntos actual
+
+        valid = points_3d[:, 2] > 0 # Filtramos puntos con Z > 0
+        points_3d = points_3d[valid] # Aplicamos el filtro
+
+        # Si no hay puntos validos retornamos 0.0 a manera de indicador de fallo
+        if len(points_3d) == 0:
+            return 0.0
+
+        # Proyectamos los puntos 3D a coordenadas de imagen (u, v)
+        u_arr = (points_3d[:, 0] * self.fx / points_3d[:, 2] + self.cx).astype(np.int32)
+        v_arr = (points_3d[:, 1] * self.fy / points_3d[:, 2] + self.cy).astype(np.int32)
+
+        # Filtramos los puntos que caen dentro de los límites de la máscara
+        in_bounds = (u_arr >= 0) & (u_arr < mask_w) & (v_arr >= 0) & (v_arr < mask_h)
+        u_arr = u_arr[in_bounds]
+        v_arr = v_arr[in_bounds]
+        z_arr = points_3d[in_bounds, 2]
+
+        # Conservamos solo los puntos que caen dentro de la mascara
+        in_mask = mask[v_arr, u_arr] > 0
+        z_masked = z_arr[in_mask]
+
+        # En caso de no haber puntos retornamos fallo
+        if len(z_masked) == 0:
+            return 0.0
+        # Retornamos la profundidad promedio de los puntos dentro de la mascara
+        return float(np.mean(z_masked))
 
     def rgb_cb(self, msg):
-        # Si el modelo está ocupado o no hay profundidad, saltamos el frame
-        if self.is_processing or self.last_depth is None:
+        if self.is_processing:
             return
 
         try:
@@ -92,22 +125,16 @@ class KinovaVisionSAM3:
             frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
 
             # 2. Inferencia SAM3
-            # set_image calcula los embeddings de la imagen (lo más pesado)
             self.predictor.set_image(frame_rgb)
-            
-            # Buscamos los conceptos definidos por texto (Zero-shot)
             results = self.predictor(text=self.objects_to_find)
 
             for result in results:
                 if result.masks is not None:
-                    # Las máscaras en SAM3 vienen como un tensor (N, H, W)
                     masks = result.masks.data.cpu().numpy()
                     
                     for i in range(len(masks)):
-                        # Convertir a binario para OpenCV
                         mask_uint8 = (masks[i] * 255).astype(np.uint8)
                         
-                        # Intentar obtener el nombre de la clase si existe detección asociada
                         if result.boxes is not None and len(result.boxes.cls) > i:
                             cls_id = int(result.boxes.cls[i])
                             obj_name = result.names[cls_id]
@@ -116,32 +143,35 @@ class KinovaVisionSAM3:
 
                         # 3. Cálculo de Centroide
                         M = cv2.moments(mask_uint8)
-                        if M["m00"] < 50: continue # Ignorar ruidos muy pequeños
+                        if M["m00"] < 50:
+                            continue
                         
                         u = int(M["m10"] / M["m00"])
                         v = int(M["m01"] / M["m00"])
 
-                        # 4. Obtener Profundidad Filtrada
-                        z_m = self.get_filtered_depth(u, v)
+                        # 4. Obtener profundidad desde la nube de puntos
+                        z_m = 0.0
+                        if self.last_cloud is not None:
+                            z_m = self.get_depth_from_mask(mask_uint8)
 
-                        # Filtro de distancia de seguridad para el Kinova (15cm a 1 metro)
-                        if 0.15 < z_m < 1.0:
-                            # Proyección de Píxel a Coordenadas Cámara (X, Y, Z)
-                            x_c = (u - self.cx) * z_m / self.fx
-                            y_c = (v - self.cy) * z_m / self.fy
-                            
-                            self.publish_msg(x_c, y_c, z_m)
+                        if z_m == 0.0:
+                            rospy.logwarn_throttle(5, "Sin profundidad válida, saltando objeto")
+                            continue
 
-                            # 5. Visualización
-                            contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                            cv2.drawContours(frame_bgr, contours, -1, (0, 255, 0), 2)
-                            
-                            label = f"{obj_name} {z_m:.2f}m"
-                            cv2.circle(frame_bgr, (u, v), 5, (0, 0, 255), -1)
-                            cv2.putText(frame_bgr, label, (u, v - 10), 
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                        # 5. Proyección a coordenadas 3D
+                        x_c = (u - self.cx) * z_m / self.fx
+                        y_c = (v - self.cy) * z_m / self.fy
 
-            # Mostrar ventana de monitoreo
+                        self.publish_msg(x_c, y_c, z_m)
+
+                        # 6. Visualización
+                        contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                        cv2.drawContours(frame_bgr, contours, -1, (0, 255, 0), 2)
+                        cv2.circle(frame_bgr, (u, v), 5, (0, 0, 255), -1)
+                        label = f"{obj_name} | X:{x_c:.2f} Y:{y_c:.2f} Z:{z_m:.2f}"
+                        cv2.putText(frame_bgr, label, (u, v - 10), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
             cv2.imshow("Kairós SAM3 - Monitor", frame_bgr)
             cv2.waitKey(1)
 
@@ -149,27 +179,7 @@ class KinovaVisionSAM3:
             rospy.logerr(f"Error en el ciclo de visión: {e}")
         
         finally:
-            # Liberar el flag para permitir procesar el siguiente frame disponible
             self.is_processing = False
-
-    def get_filtered_depth(self, u, v):
-        """Calcula la mediana de profundidad en un área de 7x7 para evitar ruido."""
-        try:
-            h, w = self.last_depth.shape
-            # Asegurar que el punto está dentro de la imagen
-            u = np.clip(u, 0, w-1)
-            v = np.clip(v, 0, h-1)
-            
-            # Extraer región de interés (ROI)
-            roi = self.last_depth[max(0, v-3):min(h, v+4), max(0, u-3):min(w, u+4)]
-            valid_depths = roi[roi > 0] # Filtrar ceros (píxeles sin lectura)
-            
-            if len(valid_depths) > 0:
-                # El sensor D415 entrega profundidad en mm, convertimos a metros
-                return np.median(valid_depths) * 0.001
-            return 0.0
-        except:
-            return 0.0
 
     def publish_msg(self, x, y, z):
         """Publica el punto 3D en el tópico object_centroid."""
@@ -180,6 +190,7 @@ class KinovaVisionSAM3:
         target_msg.point.y = y
         target_msg.point.z = z
         self.pub.publish(target_msg)
+        rospy.loginfo_throttle(1, f"Publicando: X={x:.3f}  Y={y:.3f}  Z={z:.3f}")
 
 if __name__ == '__main__':
     try:

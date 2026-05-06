@@ -1,0 +1,6 @@
+topics:
+  rgb_topic:         "/camera/color/image_raw"
+  camera_info_topic: "/camera/color/camera_info"
+  points_topic:      "/camera/depth/color/points"
+paths:
+  pack: "statemachine"
