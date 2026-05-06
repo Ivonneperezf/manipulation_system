@@ -1,5 +1,7 @@
 <?xml version="1.0"?>
 <launch>
+    <arg name = "use_sim" default = "true"/>
+    
     <node name="state_machine_node"
           pkg="statemachine"
           type="statemachinetest.py"
