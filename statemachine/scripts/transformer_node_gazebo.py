@@ -43,6 +43,7 @@ class KinovaTransformer:
 
     def callback(self, msg_cam):
         try:
+            rospy.loginfo(msg_cam)
             msg_robot = self.tf_buffer.transform(
                 msg_cam, self.ROBOT_BASE, timeout=rospy.Duration(0.2)
             )

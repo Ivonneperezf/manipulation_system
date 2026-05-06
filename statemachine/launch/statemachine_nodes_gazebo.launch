@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
     <node name="state_machine_node"
-          pkg="sim_kinova"
+          pkg="statemachine"
           type="statemachinetest.py"
           output="screen" />
 </launch>

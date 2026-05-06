@@ -17,7 +17,7 @@ class KinovaVisionSAM3:
 
         #Tópicos fijos de la RealSense D415
         self.TOPIC_RGB = "/d415/color/image_raw"
-        self.TOPIC_DEPTH = "/d415/aligned_depth_to_color/image_raw"
+        #self.TOPIC_DEPTH = "/d415/aligned_depth_to_color/image_raw"
         self.TOPIC_INFO = "/d415/color/camera_info"
         
         # Flag para evitar que los callbacks se acumulen (Control de Concurrencia)
@@ -70,7 +70,7 @@ class KinovaVisionSAM3:
 
         #Estado y Suscriptores
         self.last_depth = None # Variable para almacenar la última imagen de profundidad recibida, necesaria para sincronizar con el RGB
-        rospy.Subscriber(self.TOPIC_DEPTH, Image, self.depth_cb) # Suscripción a la imagen de profundidad alineada con el color, sin cola para procesar cada frame de profundidad que llega
+        #rospy.Subscriber(self.TOPIC_DEPTH, Image, self.depth_cb) # Suscripción a la imagen de profundidad alineada con el color, sin cola para procesar cada frame de profundidad que llega
         rospy.Subscriber(self.TOPIC_RGB, Image, self.rgb_cb, queue_size=1, buff_size=2**24) # Suscripción a la imagen RGB con cola de tamaño 1 para no saturar la memoria si el procesamiento es lento
         
         rospy.loginfo("Nodo SAM3 listo y procesando...")

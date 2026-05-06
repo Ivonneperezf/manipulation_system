@@ -27,7 +27,7 @@ class KinovaVisionD415:
         rospack      = rp.RosPack()
         package_path = (rospack.get_path(rospy.get_param("~paths/pack")),rospack.get_path('statemachine'))
         self.yolo    = YOLO(package_path + '/weights/yolov8s.pt')
-        self.sam     = SAM(package_path  + '/weights/sam2_t.pt')
+        self.sam     = SAM(package_path  + '/weights/sam2_b.pt')
 
         # Obtenemos parámetros intrínsecos de la cámara desde el tópico de info
         rospy.loginfo("Sincronizando con cámara Gazebo D415...")
