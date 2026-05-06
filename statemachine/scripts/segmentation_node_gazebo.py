@@ -56,33 +56,46 @@ class KinovaVisionD415:
             self.last_cloud = np.array(puntos, dtype=np.float32)
 
     # Funcion para obtener la profundidad promedio dentro de la mascara de SAM
-    def get_depth_from_mask(self, mask):
+    def get_depth_from_mask(self, mask, frame_shape):
         # Si no hay nube de puntos, retornamos 0.0 como indicador de fallo
         if self.last_cloud is None:
             return 0.0
 
-        mask_h, mask_w = mask.shape # Obtenemos dimensiones de la mascara
-        points_3d = self.last_cloud # Obtenemos la nube de puntos actual
+        mask_h, mask_w = mask.shape  # Obtenemos dimensiones de la mascara
+        img_h, img_w   = frame_shape[:2]  # Obtenemos dimensiones del frame original
+        points_3d = self.last_cloud  # Obtenemos la nube de puntos actual
 
-        valid = points_3d[:, 2] > 0 # Filtramos puntos con Z > 0
-        points_3d = points_3d[valid] # Aplicamos el filtro
+
+        valid = points_3d[:, 2] > 0  # Filtramos puntos con Z > 0
+        points_3d = points_3d[valid]  # Aplicamos el filtro
 
         # Si no hay puntos validos retornamos 0.0 a manera de indicador de fallo
         if len(points_3d) == 0:
             return 0.0
 
-        # Proyectamos los puntos 3D a coordenadas de imagen (u, v)
+        # Proyectamos los puntos 3D a coordenadas de imagen usando los intrinsecos del frame original
         u_arr = (points_3d[:, 0] * self.fx / points_3d[:, 2] + self.cx).astype(np.int32)
         v_arr = (points_3d[:, 1] * self.fy / points_3d[:, 2] + self.cy).astype(np.int32)
+        rospy.loginfo_throttle(2, f"DEBUG: u rango=[{u_arr.min()},{u_arr.max()}] v rango=[{v_arr.min()},{v_arr.max()}] | img limites w={img_w} h={img_h}")
 
-        # Filtramos los puntos que caen dentro de los límites de la máscara
-        in_bounds = (u_arr >= 0) & (u_arr < mask_w) & (v_arr >= 0) & (v_arr < mask_h)
+        # Filtramos los puntos que caen dentro de los límites del frame original
+        in_bounds = (u_arr >= 0) & (u_arr < img_w) & (v_arr >= 0) & (v_arr < img_h)
         u_arr = u_arr[in_bounds]
         v_arr = v_arr[in_bounds]
         z_arr = points_3d[in_bounds, 2]
 
+        # Escalamos las coordenadas del frame original al tamaño de la mascara de SAM
+        u_mask = (u_arr * mask_w / img_w).astype(np.int32)
+        v_mask = (v_arr * mask_h / img_h).astype(np.int32)
+
+        # Filtramos nuevamente para asegurar que los indices escalados esten dentro de la mascara
+        in_bounds2 = (u_mask >= 0) & (u_mask < mask_w) & (v_mask >= 0) & (v_mask < mask_h)
+        u_mask = u_mask[in_bounds2]
+        v_mask = v_mask[in_bounds2]
+        z_arr  = z_arr[in_bounds2]
+
         # Conservamos solo los puntos que caen dentro de la mascara
-        in_mask = mask[v_arr, u_arr] > 0
+        in_mask = mask[v_mask, u_mask] > 0
         z_masked = z_arr[in_mask]
 
         # En caso de no haber puntos retornamos fallo
@@ -138,8 +151,9 @@ class KinovaVisionD415:
                 v = int(M["m01"] / M["m00"])
                 
                 # Obtenemos la profundidad promedio dentro de la mascara usando la nube de puntos
+                # Pasamos el shape del frame original para escalar correctamente la proyeccion
                 if self.last_cloud is not None:
-                    z_m = self.get_depth_from_mask(mask)
+                    z_m = self.get_depth_from_mask(mask, frame_bgr.shape)
                     
                 if z_m == 0.0:
                     rospy.logwarn_throttle(5, "Proyección de nube fallida, usando Z del centroide como fallback")

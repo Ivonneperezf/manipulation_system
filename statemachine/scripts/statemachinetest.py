@@ -7,6 +7,8 @@ import smach
 from geometry_msgs.msg import PointStamped
 from std_msgs.msg import Float64MultiArray, String
 
+SLEEP = 2.0
+
 # Estado HOME
 class Home(smach.State):
     def __init__(self):
@@ -40,6 +42,7 @@ class Home(smach.State):
 
         # Esperamos el mensaje de confirmacion de movimiento
         status_msg = rospy.wait_for_message('/motion_done', String)
+        rospy.sleep(SLEEP)
         if status_msg.data == "DONE":
             return 'Done'
         else:
@@ -56,6 +59,7 @@ class Esperar_Punto(smach.State):
         rospy.loginfo("Ejecutando estado: ESPERAR_PUNTO")
         point_robot = rospy.wait_for_message('/object_centroid_robot', PointStamped)
         userdata.point_received = point_robot
+        rospy.sleep(SLEEP)
         return 'received_point'
     
 class Mover_A_Punto(smach.State):
@@ -77,6 +81,7 @@ class Mover_A_Punto(smach.State):
 
         # Esoeramos a que se reciba la confirmacion de movimiento
         status_msg = rospy.wait_for_message('/motion_done', String)
+        rospy.sleep(SLEEP)
         if status_msg.data == "DONE":
             return 'Done'
         else:

@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <launch>
     <arg name = "use_sim" default = "true"/>
+    <arg name="py_path" default="python3"/>
     <node pkg="moveit_ros_move_group"
           type="move_group"
           name="move_group"
           output="screen">
         <remap if="$(arg use_sim)" from="/joint_states" to="/m1n6s300/joint_states"/>
-        <!-- Falso para hardware real -->
         <remap unless="$(arg use_sim)" from="/joint_states" to="/m1n6s300_driver/out/joint_state"/>
     </node>
 
@@ -15,12 +15,11 @@
           type="move_node.py"
           output="screen">
         <remap if="$(arg use_sim)" from="/joint_states" to="/m1n6s300/joint_states"/>
-        <!-- Falso para hardware real -->
         <remap unless="$(arg use_sim)" from="/joint_states" to="/m1n6s300_driver/out/joint_state"/>
     </node>
 
     <node name="transformer_node"
           pkg="statemachine"
           type="transformer_node_gazebo.py"
-          output="screen" />
+          output="screen"/>
 </launch>
