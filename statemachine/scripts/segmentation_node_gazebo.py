@@ -18,16 +18,16 @@ class KinovaVisionD415:
         self.pub = rospy.Publisher('/object_centroid', PointStamped, queue_size=10)
 
         # Cargamos topicos por defecto de simulacion
-        self.TOPIC_RGB    = rospy.get_param("~topics/rgb_topic", "/d415/color/image_raw")
-        self.TOPIC_INFO   = rospy.get_param("~topics/camera_info_topic", "/d415/color/camera_info")
+        self.TOPIC_RGB = rospy.get_param("~topics/rgb_topic", "/d415/color/image_raw")
+        self.TOPIC_INFO = rospy.get_param("~topics/camera_info_topic", "/d415/color/camera_info")
         self.TOPIC_POINTS = rospy.get_param("~topics/points_topic", "/d415/depth/points")
 
         # Cargamos los modelos 
         rospy.loginfo("Cargando modelos de YOLOv8 y MobileSAM")
-        rospack      = rp.RosPack()
-        package_path = (rospack.get_path(rospy.get_param("~paths/pack")),rospack.get_path('statemachine'))
-        self.yolo    = YOLO(package_path + '/weights/yolov8s.pt')
-        self.sam     = SAM(package_path  + '/weights/sam2_b.pt')
+        rospack = rp.RosPack()
+        package_path = rospack.get_path(rospy.get_param("~paths/pack", 'statemachine'))
+        self.yolo = YOLO(package_path + '/weights/yolov8s.pt')
+        self.sam = SAM(package_path  + '/weights/sam2_b.pt')
 
         # Obtenemos parámetros intrínsecos de la cámara desde el tópico de info
         rospy.loginfo("Sincronizando con cámara Gazebo D415...")
@@ -41,7 +41,6 @@ class KinovaVisionD415:
             return
 
         # Variables para callbacks
-        self.last_depth  = None
         self.last_cloud  = None
 
         # Subscriptores
@@ -94,10 +93,7 @@ class KinovaVisionD415:
 
     # Callback de RGB
     def rgb_cb(self, msg):
-        # Retornamos si no tenemos imagen de profundidad para validar
-        if self.last_depth is None:
-            return
-
+        # Convertimos la imagen de ROS a formato OpenCV 
         frame_rgb = ros_numpy.numpify(msg)
         frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
 
@@ -128,7 +124,8 @@ class KinovaVisionD415:
 
             # Segmentamos usando SAM con la caja de YOLO como referencia
             sam_results = self.sam.predict(frame_bgr, bboxes=[[x1, y1, x2, y2]], points=[[cx_box, cy_box]], labels=[1], verbose=False, imgsz=320)[0]
-
+            
+            z_m = 0.0
             # Si SAM devuelve una máscara válida, calculamos el centroide y la profundidad
             if sam_results.masks is not None:
                 # Calculamos el centroide de la máscara para obtener coordenadas (u, v)
@@ -139,12 +136,14 @@ class KinovaVisionD415:
                     continue
                 u = int(M["m10"] / M["m00"])
                 v = int(M["m01"] / M["m00"])
-
+                
                 # Obtenemos la profundidad promedio dentro de la mascara usando la nube de puntos
                 if self.last_cloud is not None:
                     z_m = self.get_depth_from_mask(mask)
-                    if z_m == 0.0:
-                        rospy.logwarn_throttle(5, "Proyección de nube fallida, usando Z del centroide como fallback")
+                    
+                if z_m == 0.0:
+                    rospy.logwarn_throttle(5, "Proyección de nube fallida, usando Z del centroide como fallback")
+                    continue
                 
                 # Obtenemos coordenadas 3D del centroide usando la profundidad promedio de la mascara
                 x_c = (u - self.cx) * z_m / self.fx
@@ -155,11 +154,10 @@ class KinovaVisionD415:
 
                 contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 cv2.drawContours(frame_bgr, contours, -1, (0, 255, 0), 2)
-                label     = f"{class_name.upper()} | X:{x_c:.2f} Y:{y_c:.2f} Z:{z_m:.2f}"
+                label = f"{class_name.upper()} | X:{x_c:.2f} Y:{y_c:.2f} Z:{z_m:.2f}"
                 (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)
                 cv2.rectangle(frame_bgr, (x1, y1 - 25), (x1 + w, y1), (0, 255, 0), -1)
-                cv2.putText(frame_bgr, label, (x1, y1 - 7),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+                cv2.putText(frame_bgr, label, (x1, y1 - 7), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
                 cv2.circle(frame_bgr, (u, v), 5, (0, 0, 255), -1)
 
         cv2.imshow("D415 Gazebo - YOLO+SAM", frame_bgr)
