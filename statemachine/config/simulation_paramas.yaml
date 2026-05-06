@@ -1,0 +1,8 @@
+topics:
+  rgb_topic: "/d415/color/image_raw"
+  depth_topic: "/d415/depth/image_raw"
+  camera_info_topic: "/d415/color/camera_info"
+  points_topic: "/d415/pointcloud"
+
+paths:
+  pack: 'statemachine'
