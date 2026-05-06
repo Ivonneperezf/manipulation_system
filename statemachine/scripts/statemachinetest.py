@@ -13,21 +13,26 @@ SLEEP = 2.0
 class Home(smach.State):
     def __init__(self):
         # Transiciones posibles -> Done: movimiento completado, Failed: movimiento fallido
-        smach.State.__init__(self, outcomes=['Done', 'Failed']) # PERSONAL: DEFINIR QUE HACER EN CASO DE FALLO
+        smach.State.__init__(self, outcomes=['Done', 'Failed'])
 
         # Publicación de tópicos
         self.cartesian_point = rospy.Publisher('/cartesian_goal', PointStamped, queue_size=10)
         self.joint_position = rospy.Publisher('/joint_goal', Float64MultiArray, queue_size=10)
 
+        # Parametro para usar pose de simulacion o real
+        self.use_sim = rospy.get_param('~use_sim', True)
+
         # Definicion de pose HOME cartesiana
-        self.home_pose = PointStamped()
-        self.home_pose.point.x = 0.434
-        self.home_pose.point.y = -0.002
-        self.home_pose.point.z = 0.362
+        # self.home_pose = PointStamped()
+        # self.home_pose.point.x = 0.434
+        # self.home_pose.point.y = -0.002
+        # self.home_pose.point.z = 0.362
 
         # Definición de pose HOME articular (en radianes)
+        self.home_joint_goal_simulation = Float64MultiArray()
+        self.home_joint_goal_simulation.data = [-3.1917, 3.8806, 2.9837, -1.4455, 3.1411, -2.4153]
         self.home_joint_goal = Float64MultiArray()
-        self.home_joint_goal.data = [-3.1917, 3.8806, 2.9837, -1.4455, 3.1411, -2.4153]
+        self.home_joint_goal.data = [5.459746550771446, 3.660275500131915, 2.207720329943228, 5.587832881295461, 1.870707946638061, 2.3938779533008567]
 
     def execute(self, userdata):
         rospy.loginfo("Ejecutando estado: HOME")
@@ -38,7 +43,10 @@ class Home(smach.State):
             # Si el nodo esta apagado retorna error
             if rospy.is_shutdown(): return 'Failed'
         
-        self.joint_position.publish(self.home_joint_goal)
+        if self.use_sim:
+            self.joint_position.publish(self.home_joint_goal_simulation)
+        else:
+            self.joint_position.publish(self.home_joint_goal)
 
         # Esperamos el mensaje de confirmacion de movimiento
         status_msg = rospy.wait_for_message('/motion_done', String)

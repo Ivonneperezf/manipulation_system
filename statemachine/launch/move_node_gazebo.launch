@@ -18,8 +18,15 @@
         <remap unless="$(arg use_sim)" from="/joint_states" to="/m1n6s300_driver/out/joint_state"/>
     </node>
 
-    <node name="transformer_node"
+    <node if="$(arg use_sim)"
+        name="transformer_node"
+        pkg="statemachine"
+        type="transformer_node_gazebo.py"
+        output="screen"/>
+
+    <node unless="$(arg use_sim)"
+          name="transformer_node"
           pkg="statemachine"
-          type="transformer_node_gazebo.py"
+          type="transformer_node.py"
           output="screen"/>
 </launch>
