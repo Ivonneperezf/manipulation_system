@@ -21,42 +21,49 @@ roslaunch gazebo_sim rviz_kinova_sim.launch
 #### Comando para lanzar nodo de movimiento
 
 ``` bash
-roslaunch statemachine move_node_gazebo.launch
+roslaunch statemachine move_node.launch
 ```
 
 #### Comando para lanzar segmentacion
 
 ``` bash
-roslaunch statemachine segmentation_gazebo.launch
+roslaunch statemachine segmentation.launch
 ```
 
 #### Comando para lanzar maquina de estados
 
 ``` bash
-roslaunch statemachine statemachine_node_gazebo.launch
+roslaunch statemachine statemachine_node.launch
 ```
 
 ## Especificaciones para el brazo fisico
 
 Los archivos de Moveit! sirven para la implementación del brazo fisico, aunque ya existen algunos elementos que deben de ajustarse.
 
-Las pruebas para ver SAM3 se deben de lanzar mediante el siguiente ccomando:
+#### **Las pruebas para ver SAM3 se deben de lanzar mediante el siguiente comando:**
 
 ``` bash
-roslaunch statemachine segmentation_SAM3_gazebo.launch
+roslaunch statemachine segmentation_SAM3.launch
 ```
 
 En caso de lanzar cargando los parametros de simulacion, no se debe de modificar ningun parametro, en caso contrario ejecutar el siguiente comando:
 ``` bash
-roslaunch statemachine segmentation_SAM3_gazebo.launch use_simulation_params:=false
+roslaunch statemachine segmentation_SAM3.launch use_simulation_params:=false
 ```
 
-De igual manera para SAM 2
+#### **De igual manera para SAM 2**
+
+Lanzamiento de segmentacion
 ``` bash
-roslaunch statemachine segmentation_gazebo.launch use_simulation_params:=false
+roslaunch statemachine segmentation.launch use_simulation_params:=false
 ```
 
-Finalmente, para implementar el nodo de movimiento para el brazo fisico ejecutar el siguiente comando:
+Lanzamiento de nodo de movimiento
 ``` bash
-roslaunch statemachine move_node_gazebo.launch use_sim:=false
+roslaunch statemachine move_node.launch use_sim:=false
+```
+
+Lanzamiento de maquina de estados
+``` bash
+roslaunch statemachine statemachine_nodes.launch use_sim:=false
 ```
