@@ -41,7 +41,7 @@ def all_close(goal, actual, tolerance):
 # VARIABLES GLOBALES PARA CONTROLAR LOS PARÁMETROS DE MOVIMIENTO DEL BRAZO
 PLANNING_TIME = 10.0 # Tiempo máximo de planificación de movimientos
 PLANNING_ATTEMPTS = 5 # Máximo de intentos para encontrar un plan de movimiento exitoso
-VELOCITY_SCALING = 0.5 # Escalado de velocidad para movimientos más suaves
+VELOCITY_SCALING = 0.4 # Escalado de velocidad para movimientos más suaves
 ACCELERATION_SCALING = 0.2 # Escalado de aceleración para movimientos más suaves
 WORKSPACE = [-1.0, -1.0, -0.2, 1.0, 1.0, 1.5] # Tamaño del workspace definido como un cubo con límites en x, y, z
 OFFSET = 0.1 # Offset para determinar por ejemplo el tamaño del tenedor (5 cm)
