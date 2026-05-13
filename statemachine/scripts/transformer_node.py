@@ -5,6 +5,8 @@ from geometry_msgs.msg import PointStamped
 from tf.transformations import quaternion_matrix
 import tf_conversions
 import tf2_ros
+import csv
+import rospkg as rp
 
 class KinovaTransformer:
     def __init__(self):
@@ -13,6 +15,10 @@ class KinovaTransformer:
         # Frames
         self.base_frame = "m1n6s300_link_base"
         self.ee_frame = "m1n6s300_link_5"
+
+        # Rutas
+        rospack = rp.RosPack()
+        self.package_path = rospack.get_path(rospy.get_param("~paths/pack", 'statemachine'))
 
         # Cargar calibración
         prefix = "/camera_to_robot"
@@ -64,6 +70,10 @@ class KinovaTransformer:
             out.point.x = p_base[0]
             out.point.y = p_base[1]
             out.point.z = p_base[2]
+
+            with open(f"{self.package_path}/config/transform_points.csv", "a", newline="", encoding="utf-8") as file:
+                text = csv.writer(file)
+                text.writerow([p_base[0],p_base[1],p_base[2]])
             self.pub.publish(out)
 
             rospy.loginfo_throttle(2, f"BASE -> X:{p_base[0]:.3f} Y{p_base[1]:.3f} Z{p_base[2]:.3f}")
