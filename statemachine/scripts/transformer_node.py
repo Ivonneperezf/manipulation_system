@@ -3,19 +3,28 @@ import rospy
 import numpy as np
 from geometry_msgs.msg import PointStamped
 from tf.transformations import quaternion_matrix
+import tf_conversions
+import tf2_ros
 
 class KinovaTransformer:
     def __init__(self):
         rospy.init_node('direct_transformer')
 
+        # Frames
+        self.base_frame = "m1n6s300_link_base"
+        self.ee_frame = "m1n6s300_link_5"
+
         # Cargar calibración
         prefix = "/camera_to_robot"
         t = rospy.get_param(f"{prefix}/translation")
         r = rospy.get_param(f"{prefix}/rotation")
+        
+        self.T_cam2ee = tf_conversions.transformations.quaternion_matrix([r['x'], r['y'], r['z'], r['w']])
+        self.T_cam2ee[0:3,3]= [t['x'], t['y'], t['z']]
 
-        # Convertir a matriz homogénea
-        self.T = quaternion_matrix([r['x'], r['y'], r['z'], r['w']])
-        self.T[0:3, 3] = [t['x'], t['y'], t['z']]
+        # Obtenemos la transformada en tiempo real de las articulaciones
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
         # Subs y pubs
         self.sub = rospy.Subscriber('/object_centroid', PointStamped, self.callback)
@@ -24,24 +33,43 @@ class KinovaTransformer:
         rospy.loginfo("Transformación a sistema de referencia del brazo")
 
     def callback(self, msg):
-        # Punto en camara
-        p_cam = np.array([msg.point.x, msg.point.y, msg.point.z, 1.0])
+        try:
+            # Obtenemos los tf de link_5 y base_link en tiempo real
+            trans = self.tf_buffer.lookup_transform(
+                self.base_frame,
+                self.ee_frame,
+                rospy.Time(0),
+                rospy.Duration(0)
+            )
 
-        # Transformacion directa
-        p_base = self.T @ p_cam
+            t = trans.transform.translation
+            q = trans.transform.rotation
 
-        # Crear mensaje
-        out = PointStamped()
-        out.header.stamp = rospy.Time.now()
-        out.header.frame_id = "m1n6s300_link_base"
+            T_ee2base = tf_conversions.transformations.quaternion_matrix(
+                [q.x, q.y, q.z, q.w]
+            )
+            T_ee2base[0:3,3] = [t.x, t.y, t.z]
 
-        out.point.x = p_base[0]
-        out.point.y = p_base[1]
-        out.point.z = p_base[2]
+            # Calculamos la transformada respecto a la base
+            T_cam2base = T_ee2base @ self.T_cam2ee
 
-        self.pub.publish(out)
+            # Transformamos el punto respecto a la base del brazo
+            p_cam = np.array([msg.point.x, msg.point.y, msg.point.z,1.0])
+            p_base = T_cam2base @ p_cam
 
-        rospy.loginfo_throttle(2, f"BASE → X:{p_base[0]:.3f} Y:{p_base[1]:.3f} Z:{p_base[2]:.3f}")
+            # Publicamos el punto transformado
+            out = PointStamped()
+            out.header.stamp = rospy.Time.now()
+            out.header.frame_id = self.base_frame
+            out.point.x = p_base[0]
+            out.point.y = p_base[1]
+            out.point.z = p_base[2]
+            self.pub.publish(out)
+
+            rospy.loginfo_throttle(2, f"BASE -> X:{p_base[0]:.3f} Y{p_base[1]:.3f} Z{p_base[2]:.3f}")
+        except Exception as e:
+            rospy.logwarn(f"Error TF: {e}")
+
 
 if __name__ == '__main__':
     KinovaTransformer()

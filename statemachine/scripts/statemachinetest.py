@@ -104,8 +104,10 @@ def main():
     # Estados y transiciones
     with sm:
         # Estado HOME
+        #smach.StateMachine.add('HOME', Home(), 
+        #                       transitions={'Done':'ESPERAR_PUNTO', 'Failed':'HOME'})
         smach.StateMachine.add('HOME', Home(), 
-                               transitions={'Done':'ESPERAR_PUNTO', 'Failed':'HOME'})
+                               transitions={'Done':'ESPERAR_PUNTO', 'Failed':'ESPERAR_PUNTO'})
 
         # Estado ESPERAR_PUNTO
         smach.StateMachine.add('ESPERAR_PUNTO', Esperar_Punto(), 
