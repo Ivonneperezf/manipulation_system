@@ -45,7 +45,7 @@ class KinovaVisionSAM3:
         rospy.Subscriber(self.TOPIC_POINTS, PointCloud2, self.cloud_cb, queue_size=1)
 
         # Variables
-        self.objets_segment= ["apple"]
+        self.objets_segment= ["object in bowl"]
         self.last_cloud = None
     
     # Callback de nube de puntos
@@ -118,7 +118,7 @@ class KinovaVisionSAM3:
             z_medio = np.mean([c[4] for c in centroids])
 
             cv2.circle(frame_bgr, (u_medio, v_medio), 8, (0, 0, 255), -1)
-            cv2.putText(frame_bgr, "apple", (u_medio + 10, v_medio),
+            cv2.putText(frame_bgr, f"apple ({x_medio:.3f}, {y_medio:.3f}, {z_medio:.3f})", (u_medio + 10, v_medio),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
             self.publish_msg(x_medio, y_medio, z_medio)
