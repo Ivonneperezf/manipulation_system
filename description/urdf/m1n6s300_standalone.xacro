@@ -18,7 +18,7 @@
 
 
   <xacro:include filename="$(find description)/urdf/m1n6s300.xacro"/>
-  <xacro:include filename="$(find description)/urdf/_d415.urdf.xacro"/>
+  <!-- <xacro:include filename="$(find description)/urdf/_d415.urdf.xacro"/> -->
 
   <link name="root"/>
 

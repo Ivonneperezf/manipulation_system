@@ -152,16 +152,14 @@
         <xacro:kinova_virtual_link link_name="${prefix}_end_effector"/>
         <xacro:kinova_virtual_joint joint_name="${prefix}_joint_end_effector" type="${joint_end_effector_type}" parent="${prefix}_link_6" child="${prefix}_end_effector" joint_axis_xyz="${joint_end_effector_axis_xyz}" joint_origin_xyz="${joint_end_effector_origin_xyz}" joint_origin_rpy="${joint_end_effector_origin_rpy}" joint_lower_limit="0" joint_upper_limit="0"/>
 
-        <!-- Montura de la camara en la quinta articulación del brazo -->
+        
 
-        <link name="${prefix}_d415_mount_link"/>
+        <!-- <link name="${prefix}_d415_mount_link"/>
 
         <joint name="${prefix}_d415_mount_joint" type="fixed">
             <parent link="${prefix}_link_5"/>
-            <!-- <parent link="${prefix}_link_6"/> -->
             <child link="${prefix}_d415_mount_link"/>
             <origin xyz="0.000 -0.129 0.004" rpy="3.142 0.524 -1.571"/>
-            <!-- <origin xyz="0.0 0.105 -0.045" rpy="1.5708 3.1416 0.0"/> -->
         </joint>
 
         <xacro:sensor_d415
@@ -171,9 +169,6 @@
             <origin xyz="0 0 0" rpy="0 0 0"/>
         </xacro:sensor_d415>
 
-        <!-- Definición de tópicos-->
-
-        <!-- Color camera -->
         <gazebo reference="d415_color_frame">
             <sensor type="camera" name="d415_color">
                 <update_rate>30.0</update_rate>
@@ -206,7 +201,6 @@
             </sensor>
         </gazebo>
 
-        <!-- Depth camera -->
         <gazebo reference="d415_depth_frame">
             <sensor type="depth" name="d415_depth">
                 <update_rate>30.0</update_rate>
@@ -241,7 +235,7 @@
                     <distortionT2>0.0</distortionT2>
                 </plugin>
             </sensor>
-        </gazebo>
+        </gazebo> -->
 
     <xacro:kinova_3fingers link_hand="${prefix}_link_6" prefix="${prefix}_"/>
     </xacro:macro>

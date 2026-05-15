@@ -43,7 +43,8 @@ PLANNING_TIME = 10.0 # Tiempo máximo de planificación de movimientos
 PLANNING_ATTEMPTS = 5 # Máximo de intentos para encontrar un plan de movimiento exitoso
 VELOCITY_SCALING = 0.4 # Escalado de velocidad para movimientos más suaves
 ACCELERATION_SCALING = 0.2 # Escalado de aceleración para movimientos más suaves
-WORKSPACE = [-1.0, -1.0, -0.2, 1.0, 1.0, 1.5] # Tamaño del workspace definido como un cubo con límites en x, y, z
+#WORKSPACE = [-1.0, -1.0, -0.2, 1.0, 1.0, 1.5] # Tamaño del workspace definido como un cubo con límites en x, y, z
+WORKSPACE = [-5.0, -5.0, -5.0, 5.0, 5.0, 5.0]
 OFFSET = 0.1 # Offset para determinar por ejemplo el tamaño del tenedor (5 cm)
 TOLERANCE = 0.01 # Tolerancia para considerar que el robot ha alcanzado la posición objetivo (1 cm)
 
