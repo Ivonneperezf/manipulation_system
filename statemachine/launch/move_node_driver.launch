@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<launch>
+    <rosparam command="load" file="$(find statemachine)/config/handeye_calibration.yaml"/>
+    <arg name = "use_sim" default = "true"/>
+    <arg name="py_path" default="python3"/>
+
+    <node name="kinova_move"
+          pkg="statemachine"
+          type="move_node_api_kinova.py"
+          output="screen">
+    </node>
+
+    <node if="$(arg use_sim)"
+        name="transformer_node"
+        pkg="statemachine"
+        type="transformer_node_gazebo.py"
+        output="screen"/>
+
+    <node unless="$(arg use_sim)"
+          name="transformer_node"
+          pkg="statemachine"
+          type="transformer_node.py"
+          output="screen"/>
+</launch>
