@@ -19,7 +19,7 @@ class MoveNodeKinova():
     def __init__(self):
         # Cargamos los parametros necesarios
         self.kinova_robotType = rospy.get_param("~kinova_robotType", "m1n6s300")
-        #self.unit = rospy.get_param("~unit", "mq")
+        self.unit = rospy.get_param("~unit", "mq")
         self.verbose = rospy.get_param("~verbose", False)
         #self.relative = rospy.get_param("~relative", False)
 
@@ -35,9 +35,12 @@ class MoveNodeKinova():
         self.finger_maxTurn = 6800  # max thread turn for one finger
 
         # Variable para alcenar la posicion actual del robot
-        self.currentCartesianCommand = [0.0] * 6 # default home in unit mq
+        self.currentJointCommand = []
+        self.currentCartesianCommand = [0.0] * 7# default home in unit mq
         # Inicializamos el nodo 
         rospy.init_node('move_node_kinova')
+
+        rospy.loginfo('Nodo iniciado, esperando comandos...')
 
         # Publishers
         self.status_pub = rospy.Publisher('/motion_done', String, queue_size=10)
@@ -61,13 +64,64 @@ class MoveNodeKinova():
 
     def _joint_callback(self, msg):
         self.joint_goal = msg.data
+        rospy.loginfo(f"Recibido joint goal: {self.joint_goal}, ejecutando movimiento...")
+        self.getcurrentJointCommand()  # Obtenemos la posición actual del robot antes de enviar el comando
+        joint_degree, joint_radian = self.unitParser(self.unit, self.joint_goal, False)
+        positions = [0]*7
         try:
-            result = self.joint_angle_client(self.joint_goal)
+            if self.arm_joint_number < 1:
+                print('Joint number is 0, check with "-h" to see how to use this node.')
+                positions = []  # Get rid of static analysis warning that doesn't see the exit()
+                sys.exit() 
+            else:
+                for i in range(0,self.arm_joint_number):
+                    positions[i] = joint_degree[i] 
+            result = self.joint_angle_client(positions)
             rospy.loginfo('Joint angles sent!')
             self.status_pub.publish("DONE" if result else "FAILED")
         except Exception as e:
             rospy.logerr(f"Error al ejecutar el movimiento: {e}")
             self.status_pub.publish("FAILED")
+    
+    def getcurrentJointCommand(self,):
+        # wait to get current position
+        topic_address = '/' + self.prefix + 'driver/out/joint_command'
+        rospy.Subscriber(topic_address, kinova_msgs.msg.JointAngles, self.setcurrentJointCommand)
+        rospy.wait_for_message(topic_address, kinova_msgs.msg.JointAngles)
+        print('position listener obtained message for joint position. ')
+    
+    def setcurrentJointCommand(self,feedback):
+        currentJointCommand_str_list = str(feedback).split("\n")
+        for index in range(0,len(currentJointCommand_str_list)):
+            temp_str=currentJointCommand_str_list[index].split(": ")
+            self.currentJointCommand[index] = float(temp_str[1])
+
+    def unitParser(self,unit, joint_value, relative_):
+        """ Argument unit """
+        global currentJointCommand
+
+        if unit == 'degree':
+            joint_degree_command = joint_value
+            # get absolute value
+            if relative_:
+                joint_degree_absolute_ = [joint_degree_command[i] + currentJointCommand[i] for i in range(0, len(joint_value))]
+            else:
+                joint_degree_absolute_ = joint_degree_command
+            joint_degree = joint_degree_absolute_
+            joint_radian = list(map(math.radians, joint_degree_absolute_))
+        elif unit == 'radian':
+            joint_degree_command = list(map(math.degrees, joint_value))
+            # get absolute value
+            if relative_:
+                joint_degree_absolute_ = [joint_degree_command[i] + currentJointCommand[i] for i in range(0, len(joint_value))]
+            else:
+                joint_degree_absolute_ = joint_degree_command
+            joint_degree = joint_degree_absolute_
+            joint_radian = list(map(math.radians, joint_degree_absolute_))
+        else:
+            raise Exception("Joint value have to be in degree, or radian")
+
+        return joint_degree, joint_radian
 
     # Obtenemos la posición actual del robot
     def getcurrentCartesianCommand(self):
@@ -116,6 +170,7 @@ class MoveNodeKinova():
                                             kinova_msgs.msg.ArmJointAnglesAction)
         client.wait_for_server()
 
+        rospy.loginfo(f"Enviando joint angles: {angle_set} al action server en {action_address}")
         goal = kinova_msgs.msg.ArmJointAnglesGoal()
 
         goal.angles.joint1 = angle_set[0]
@@ -127,6 +182,7 @@ class MoveNodeKinova():
         goal.angles.joint7 = angle_set[6]
 
         client.send_goal(goal)
+        rospy.loginfo(f"Joint angles enviados al action server: {goal.angles}")
         if client.wait_for_result(rospy.Duration(20.0)):
             return client.get_result()
         else:
