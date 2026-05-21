@@ -36,7 +36,8 @@ class MoveNodeKinova():
 
         # Variable para alcenar la posicion actual del robot
         self.currentJointCommand = []
-        self.currentCartesianCommand = [0.0] * 7# default home in unit mq
+        self.pose_value = []
+        self.currentCartesianCommand = [] 
         # Inicializamos el nodo 
         rospy.init_node('move_node_kinova')
 
@@ -50,17 +51,24 @@ class MoveNodeKinova():
         rospy.Subscriber('/joint_goal', Float64MultiArray, self._joint_callback)
 
     # Callback para recibir el punto deseado y ejecutar el movimiento
+    # Siempre es en unidades de mq
     def _cartesian_callback(self, msg):
-        orientation = self.currentCartesianCommand[3:]
-        pose = [msg.point.x, msg.point.y, msg.point.z] + orientation
-        rospy.loginfo(f"Recibido punto: {pose}, ejecutando movimiento...")
+        self.getcurrentCartesianCommand()  # Obtenemos la posición actual del robot antes de enviar el comando
+        orientation_q = self.EulerXYZ2Quaternion(self.currentCartesianCommand[3:])
+        self.pose_value = [msg.point.x, msg.point.y, msg.point.z] + orientation_q
         try:
-            result = self.cartesian_pose_client(pose[:3], pose[3:])
+
+            poses = [float(n) for n in self.pose_value]
+
+            result = self.cartesian_pose_client(poses[:3], poses[3:])
+
             rospy.loginfo('Cartesian pose sent!')
             self.status_pub.publish("DONE" if result else "FAILED")
-        except Exception as e:
-            rospy.logerr(f"Error al ejecutar el movimiento: {e}")
+
+        except rospy.ROSInterruptException:
+            rospy.logerr("program interrupted before completion")
             self.status_pub.publish("FAILED")
+
 
     def _joint_callback(self, msg):
         self.joint_goal = msg.data
@@ -70,7 +78,7 @@ class MoveNodeKinova():
         positions = [0]*7
         try:
             if self.arm_joint_number < 1:
-                print('Joint number is 0, check with "-h" to see how to use this node.')
+                rospy.logerr('Joint number is 0, check with "-h" to see how to use this node.')
                 positions = []  # Get rid of static analysis warning that doesn't see the exit()
                 sys.exit() 
             else:
@@ -88,7 +96,7 @@ class MoveNodeKinova():
         topic_address = '/' + self.prefix + 'driver/out/joint_command'
         rospy.Subscriber(topic_address, kinova_msgs.msg.JointAngles, self.setcurrentJointCommand)
         rospy.wait_for_message(topic_address, kinova_msgs.msg.JointAngles)
-        print('position listener obtained message for joint position. ')
+        rospy.loginfo('position listener obtained message for joint position. ')
     
     def setcurrentJointCommand(self,feedback):
         currentJointCommand_str_list = str(feedback).split("\n")
@@ -189,6 +197,48 @@ class MoveNodeKinova():
             rospy.logerr('the joint angle action timed-out')
             client.cancel_all_goals()
             return None
+    
+    def QuaternionNorm(self,Q_raw):
+        qx_temp,qy_temp,qz_temp,qw_temp = Q_raw[0:4]
+        qnorm = math.sqrt(qx_temp*qx_temp + qy_temp*qy_temp + qz_temp*qz_temp + qw_temp*qw_temp)
+        qx_ = qx_temp/qnorm
+        qy_ = qy_temp/qnorm
+        qz_ = qz_temp/qnorm
+        qw_ = qw_temp/qnorm
+        Q_normed_ = [qx_, qy_, qz_, qw_]
+        return Q_normed_
+
+
+    def Quaternion2EulerXYZ(self,Q_raw):
+        Q_normed = self.QuaternionNorm(Q_raw)
+        qx_ = Q_normed[0]
+        qy_ = Q_normed[1]
+        qz_ = Q_normed[2]
+        qw_ = Q_normed[3]
+
+        tx_ = math.atan2((2 * qw_ * qx_ - 2 * qy_ * qz_), (qw_ * qw_ - qx_ * qx_ - qy_ * qy_ + qz_ * qz_))
+        ty_ = math.asin(2 * qw_ * qy_ + 2 * qx_ * qz_)
+        tz_ = math.atan2((2 * qw_ * qz_ - 2 * qx_ * qy_), (qw_ * qw_ + qx_ * qx_ - qy_ * qy_ - qz_ * qz_))
+        EulerXYZ_ = [tx_,ty_,tz_]
+        return EulerXYZ_
+
+
+    def EulerXYZ2Quaternion(self,EulerXYZ_):
+        tx_, ty_, tz_ = EulerXYZ_[0:3]
+        sx = math.sin(0.5 * tx_)
+        cx = math.cos(0.5 * tx_)
+        sy = math.sin(0.5 * ty_)
+        cy = math.cos(0.5 * ty_)
+        sz = math.sin(0.5 * tz_)
+        cz = math.cos(0.5 * tz_)
+
+        qx_ = sx * cy * cz + cx * sy * sz
+        qy_ = -sx * cy * sz + cx * sy * cz
+        qz_ = sx * sy * cz + cx * cy * sz
+        qw_ = -sx * sy * sz + cx * cy * cz
+
+        Q_ = [qx_, qy_, qz_, qw_]
+        return Q_
         
 if __name__ == "__main__":
     try:
