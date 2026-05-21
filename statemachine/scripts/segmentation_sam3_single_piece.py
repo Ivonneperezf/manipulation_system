@@ -8,6 +8,7 @@ from sensor_msgs.msg import Image, CameraInfo, PointCloud2
 from geometry_msgs.msg import PointStamped
 from ultralytics.models.sam import SAM3SemanticPredictor
 import sensor_msgs.point_cloud2 as pc2
+from typing import List, Tuple, Optional
 
 #Llimpieza de mascaras
 class MaskFilter:
@@ -41,11 +42,11 @@ class MaskFilter:
 
     def _basic_filter(
         self, masks: np.ndarray, img_area: int
-    ) -> tuple[list[np.ndarray], list[int]]:
+    ) -> Tuple[List[np.ndarray], List[int]]:
         """ Devuelve (máscaras_válidas, índices_originales).
         Trabajamos con bool arrays para eficiencia."""
-        kept_masks: list[np.ndarray] = []
-        kept_indices: list[int] = []
+        kept_masks: List[np.ndarray] = []
+        kept_indices: List[int] = []
 
         for idx, mask in enumerate(masks):
             mask_bool = mask.astype(bool)
@@ -61,7 +62,7 @@ class MaskFilter:
 
             #compacidad: descarta L-shapes y formas degeneradas
             ys, xs = np.where(mask_bool)
-            bbox_area = (xs.max() - xs.min()) * (ys.max() - ys.min())
+            bbox_area = (xs.max() - xs.min() + 1) * (ys.max() - ys.min() + 1)
             if mask_area / (bbox_area + 1e-6) < self.min_compactness:
                 continue
 
@@ -72,8 +73,8 @@ class MaskFilter:
 
     #FILTRO 2: elimina máscaras contenedoras
     def _remove_containing_masks(
-        self, masks: list[np.ndarray], original_indices: list[int]
-    ) -> tuple[list[np.ndarray], list[int]]:
+        self, masks: List[np.ndarray], original_indices: List[int]
+    ) -> Tuple[List[np.ndarray], List[int]]:
         """ Elimina máscaras j que son claramente contenedoras de i.
         Condición para marcar j como contenedora:
           • areas[j] >= areas[i] * size_ratio_min   (j es bastante más grande)
@@ -109,7 +110,7 @@ class MaskFilter:
 
     def clean(
         self, raw_masks: np.ndarray, img_area: int
-    ) -> tuple[list[np.ndarray], list[int]]:
+    ) -> Tuple[List[np.ndarray], List[int]]:
         """ Devuelve (máscaras_limpias_bool, índices_en_raw_masks).
         Los índices permiten recuperar metadatos (cls, conf) del resultado SAM3. """
         masks, indices = self._basic_filter(raw_masks, img_area)
@@ -162,11 +163,11 @@ class KinovaVisionSAM3:
             rospy.logerr("No se detectó la cámara D415.")
             return
         #Estado compartido
-        self.last_cloud: np.ndarray | None = None
+        self.last_cloud: Optional[np.ndarray] = None
 
         rospy.Subscriber(self.TOPIC_RGB,    Image,       self.rgb_cb,   queue_size=1, buff_size=2**24)
         rospy.Subscriber(self.TOPIC_POINTS, PointCloud2, self.cloud_cb, queue_size=1)
-        rospy.loginfo("Nodo SAM3 listo.")
+        rospy.loginfo("Nodo SAM3 Listo.")
 
     #Callback de la nube de puntos
     def cloud_cb(self, msg: PointCloud2) -> None:
@@ -195,7 +196,7 @@ class KinovaVisionSAM3:
         #Inferencia SAM3
         self.predictor.set_image(frame_rgb)
         results = self.predictor(text=self.objects_to_find)
-        centroids: list[tuple] = []
+        centroids: List[Tuple[int, int, float, float, float, str]] = []
         for result in results:
             if result.masks is None:
                 continue
@@ -261,7 +262,7 @@ class KinovaVisionSAM3:
         cv2.waitKey(1)
 
     #Profundidad promedio dentro de máscara
-    def get_depth_from_mask(self, mask: np.ndarray, frame_shape: tuple) -> float:
+    def get_depth_from_mask(self, mask: np.ndarray, frame_shape: Tuple[int, int, int]) -> float:
         if self.last_cloud is None:
             return 0.0
         mask_h, mask_w = mask.shape
