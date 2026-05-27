@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>calibration_pkg</name>
+  <version>0.0.1</version>
+  <description>
+    Hand-eye calibration tools for Kinova robotic arms using TF.
+  </description>
+
+  <maintainer email="ivonneperezfl243@gmail.com">Ivonne</maintainer>
+  <author>Ivonne</author>
+
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <!-- Dependencias necesarias para tu nodo Python -->
+  <depend>rospy</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf_conversions</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>opencv-python</depend>
+
+  <export>
+    <!-- Información adicional para la exportación -->
+  </export>
+
+</package>

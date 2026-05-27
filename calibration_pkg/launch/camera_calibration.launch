@@ -1,0 +1,6 @@
+<launch>
+    <node pkg="calibration"
+          type="calibration_d415.py"
+          name="camera_calibration_node"
+          output="screen"/>
+</launch>

@@ -35,9 +35,9 @@ class MoveNodeKinova():
         self.finger_maxTurn = 6800  # max thread turn for one finger
 
         # Variable para alcenar la posicion actual del robot
-        self.currentJointCommand = []
+        self.currentJointCommand = [0.0]*7
         self.pose_value = []
-        self.currentCartesianCommand = [] 
+        self.currentCartesianCommand = [0.0] * 7
         # Inicializamos el nodo 
         rospy.init_node('move_node_kinova')
 
@@ -55,6 +55,7 @@ class MoveNodeKinova():
     def _cartesian_callback(self, msg):
         self.getcurrentCartesianCommand()  # Obtenemos la posición actual del robot antes de enviar el comando
         orientation_q = self.EulerXYZ2Quaternion(self.currentCartesianCommand[3:])
+        rospy.loginfo(f"orientacion {orientation_q}")
         self.pose_value = [msg.point.x, msg.point.y, msg.point.z] + orientation_q
         try:
 
@@ -71,10 +72,11 @@ class MoveNodeKinova():
 
 
     def _joint_callback(self, msg):
-        self.joint_goal = msg.data
+        rospy.loginfo(f"Recibido mensaje en /joint_goal: {msg}")
+        self.joint_goal = [float(n) for n in msg.data]
         rospy.loginfo(f"Recibido joint goal: {self.joint_goal}, ejecutando movimiento...")
         self.getcurrentJointCommand()  # Obtenemos la posición actual del robot antes de enviar el comando
-        joint_degree, joint_radian = self.unitParser(self.unit, self.joint_goal, False)
+        joint_degree, joint_radian = self.unitParser("radian", self.joint_goal, False)
         positions = [0]*7
         try:
             if self.arm_joint_number < 1:

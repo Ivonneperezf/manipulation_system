@@ -22,7 +22,7 @@
     <!-- Import all Gazebo-customization elements -->
     <xacro:include filename="$(find description)/urdf/kinova.gazebo" />
     <!-- incluir archivo para la camara -->
-    <!-- <xacro:include filename="$(find realsense2_description)/urdf/_d415.urdf.xacro"/> -->
+    <xacro:include filename="$(find realsense2_description)/urdf/_d415.urdf.xacro"/>
 
     <xacro:property name="link_base_mesh" value="base" />
     <xacro:property name="link_1_mesh" value="shoulder" />
@@ -154,7 +154,7 @@
 
         
 
-        <!-- <link name="${prefix}_d415_mount_link"/>
+        <link name="${prefix}_d415_mount_link"/>
 
         <joint name="${prefix}_d415_mount_joint" type="fixed">
             <parent link="${prefix}_link_5"/>
@@ -235,7 +235,7 @@
                     <distortionT2>0.0</distortionT2>
                 </plugin>
             </sensor>
-        </gazebo> -->
+        </gazebo>
 
     <xacro:kinova_3fingers link_hand="${prefix}_link_6" prefix="${prefix}_"/>
     </xacro:macro>
