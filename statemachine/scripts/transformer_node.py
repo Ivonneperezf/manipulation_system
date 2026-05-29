@@ -1,84 +1,109 @@
 #!/usr/bin/env python3
+"""
+Nodo que transforma puntos 3D detectados por la camara al sistema
+de referencia de la base del brazo robotico.
+
+Cadena cinematica aplicada:
+    p_base = T_base_ee @ T_ee_cam @ p_cam
+
+Donde:
+    T_base_ee  : transformada del link_5 a la base (obtenida en tiempo real por TF)
+    T_ee_cam   : transformada de la camara al link_5 (resultado de la calibracion hand-eye)
+    p_cam      : punto detectado en coordenadas de la camara
+    p_base     : punto resultante en coordenadas de la base del brazo
+"""
+
 import rospy
 import numpy as np
-from geometry_msgs.msg import PointStamped
-from tf.transformations import quaternion_matrix
-import tf_conversions
 import tf2_ros
-import csv
+import tf_conversions
 import rospkg as rp
+import csv
+from geometry_msgs.msg import PointStamped
+
 
 class KinovaTransformer:
+
     def __init__(self):
         rospy.init_node('direct_transformer')
 
-        # Frames
+        """PARAMETROS DE FRAMES"""
         self.base_frame = "m1n6s300_link_base"
-        self.ee_frame = "m1n6s300_link_5"
+        self.ee_frame   = "m1n6s300_link_5"
 
-        # Rutas
-        rospack = rp.RosPack()
-        self.package_path = rospack.get_path(rospy.get_param("~paths/pack", 'statemachine'))
+        """RUTAS"""
+        rospack          = rp.RosPack()
+        package_path     = rospack.get_path(rospy.get_param("~pack", "calibration_pkg"))
+        self.config_path = f"{package_path}/config"
 
-        # Cargar calibración
-        prefix = "/camera_to_robot"
-        t = rospy.get_param(f"{prefix}/translation")
-        r = rospy.get_param(f"{prefix}/rotation")
-        
-        self.T_cam2ee = tf_conversions.transformations.quaternion_matrix([r['x'], r['y'], r['z'], r['w']])
-        self.T_cam2ee[0:3,3]= [t['x'], t['y'], t['z']]
+        """CARGAR CALIBRACION DESDE NPZ"""
+        # Carga la matriz homogenea 4x4 resultado de la calibracion hand-eye
+        # que representa la transformada de la camara al link_5
+        npz_path      = f"{self.config_path}/handeye_result.npz"
+        data          = np.load(npz_path)
+        self.T_cam2ee = data["T"]
+        rospy.loginfo(f"Calibracion cargada desde: {npz_path}")
+        rospy.loginfo(f"T_cam2ee:\n{np.round(self.T_cam2ee, 4)}")
 
-        # Obtenemos la transformada en tiempo real de las articulaciones
-        self.tf_buffer = tf2_ros.Buffer()
+        """CONFIGURACION TF"""
+        # Buffer para obtener la transformada del link_5 a la base en tiempo real
+        self.tf_buffer   = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
-        # Subs y pubs
-        self.sub = rospy.Subscriber('/object_centroid', PointStamped, self.callback)
+        """SUSCRIPTORES Y PUBLICADORES"""
+        rospy.Subscriber('/object_centroid', PointStamped, self.callback)
         self.pub = rospy.Publisher('/object_centroid_robot', PointStamped, queue_size=10)
 
-        rospy.loginfo("Transformación a sistema de referencia del brazo")
+        rospy.loginfo("Nodo listo. Esperando puntos en /object_centroid...")
+
 
     def callback(self, msg):
         try:
-            # Obtenemos los tf de link_5 y base_link en tiempo real
+            # Obtener transformada del link_5 respecto a la base en tiempo real
             trans = self.tf_buffer.lookup_transform(
                 self.base_frame,
                 self.ee_frame,
                 rospy.Time(0),
-                rospy.Duration(0)
+                rospy.Duration(1.0)  # Tiempo de espera al buffer
             )
 
             t = trans.transform.translation
             q = trans.transform.rotation
 
-            T_ee2base = tf_conversions.transformations.quaternion_matrix(
-                [q.x, q.y, q.z, q.w]
-            )
-            T_ee2base[0:3,3] = [t.x, t.y, t.z]
+            # Convertir a matriz homogenea 4x4: T_base_ee
+            T_base_ee = tf_conversions.transformations.quaternion_matrix(
+                [q.x, q.y, q.z, q.w])
+            T_base_ee[0:3, 3] = [t.x, t.y, t.z]
 
-            # Calculamos la transformada respecto a la base
-            T_cam2base = T_ee2base @ self.T_cam2ee
+            # Cadena cinematica completa: camara -> link_5 -> base
+            # T_base_cam = T_base_ee @ T_ee_cam
+            T_base_cam = T_base_ee @ self.T_cam2ee
 
-            # Transformamos el punto respecto a la base del brazo
-            p_cam = np.array([msg.point.x, msg.point.y, msg.point.z,1.0])
-            p_base = T_cam2base @ p_cam
+            # Punto en coordenadas de la camara (homogeneo)
+            p_cam = np.array([msg.point.x, msg.point.y, msg.point.z, 1.0])
 
-            # Publicamos el punto transformado
-            out = PointStamped()
-            out.header.stamp = rospy.Time.now()
+            # Transformar al sistema de referencia de la base
+            p_base = T_base_cam @ p_cam
+
+            # Publicar punto transformado
+            out                 = PointStamped()
+            out.header.stamp    = rospy.Time.now()
             out.header.frame_id = self.base_frame
-            out.point.x = p_base[0]
-            out.point.y = p_base[1]
-            out.point.z = p_base[2]
-
-            with open(f"{self.package_path}/config/transform_points.csv", "a", newline="", encoding="utf-8") as file:
-                text = csv.writer(file)
-                text.writerow([p_base[0],p_base[1],p_base[2]])
+            out.point.x         = p_base[0]
+            out.point.y         = p_base[1]
+            out.point.z         = p_base[2]
             self.pub.publish(out)
 
-            rospy.loginfo_throttle(2, f"BASE -> X:{p_base[0]:.3f} Y{p_base[1]:.3f} Z{p_base[2]:.3f}")
+            # Guardar en CSV para analisis posterior
+            with open(f"{self.config_path}/transform_points.csv", "a",
+                      newline="", encoding="utf-8") as f:
+                csv.writer(f).writerow([p_base[0], p_base[1], p_base[2]])
+
+            rospy.loginfo_throttle(2,
+                f"p_base -> X:{p_base[0]:.3f} Y:{p_base[1]:.3f} Z:{p_base[2]:.3f}")
+
         except Exception as e:
-            rospy.logwarn(f"Error TF: {e}")
+            rospy.logwarn(f"Error en transformacion: {e}")
 
 
 if __name__ == '__main__':

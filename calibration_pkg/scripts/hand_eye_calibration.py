@@ -7,56 +7,68 @@ import numpy as np
 import cv2
 import yaml
 import threading
+import rospkg as rp
 from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+from sensor_msgs.msg import CameraInfo
 
 class HandEyeCalibration:
 
-    def __init__(self):
-
+    def __init__(self, n_captures):
+        # Iniciamos nodo de calibracion
         rospy.init_node("handeye_calibration")
 
-        # Numero de poses a capturar para la calibracion
+        """PARAMETROS DE CALIBRACION"""
+        # Definimos el frame base del robot
         self.base_frame = "m1n6s300_link_base"
-        # self.ee_frame   = "m1n6s300_end_effector"
-        self.ee_frame   = "m1n6s300_link_5"  # usando el ultimo link en vez del EE para evitar errores de colision con la camara
-        self.n_captures = 15
+        # Definimos el frame donde se encuentra la montura de la camara"
+        self.ee_frame   = "m1n6s300_link_5" 
+        # Definimos el numero de capturas a realizar
+        self.n_captures = n_captures
 
-        # Rutas
-        self.path = "/home/user/Documentos/ROS/projects/kinova_robot_ws/src/kinova-ros/calibration/config"
+        """PARAMETROS PARA GUARDAR RESULTADOS"""
+        # Obtenemos la ruta del paquete 
+        rospack = rp.RosPack()
+        path_pkg = rospack.get_path("calibration_pkg")
+        # Definimos la ruta donde se guardaran los resultados de la calibracion
+        self.path = f"{path_pkg}/config"
 
-        # Bandera de control para captura manual
+        """VARIABLES DE CALIBRACION"""
+        # Parametro para controlar la captura de poses, se activa al presionar Enter
         self.ready_to_capture = False
+        self.size = 0.045 # Tamaño del marcador del ArUco
+        self.quat = None # Variable para almacenar la orientacion en cuaterniones de la transformada resultante
+        # Listas para almacenar coordenadas y posiciones del EE a la base 
+        self.R_gripper2base = []
+        self.t_gripper2base = []
+        # Listas para almacenar coordenadas y posiciones de la camara respecto al ArUco
+        self.R_target2cam = []
+        self.t_target2cam = []
 
-        # Almacena en buffer las transformaciones
+        """CONFIGURACION DE LA CAMARA"""
+        # Cargar calibracion intrinseca desde el topic camera_info
+        rospy.loginfo("Esperando camera_info...")
+        msg = rospy.wait_for_message("/camera/color/camera_info", CameraInfo)
+        self.camera_matrix = np.array(msg.K).reshape(3, 3)
+        self.dist_coeffs = np.array(msg.D)
+        rospy.loginfo("Intrínsecos cargados desde camera_info")
+
+        """CONFIGURACION DEL ARUCO"""
+        self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250)
+        self.parameters = cv2.aruco.DetectorParameters()
+        self.detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.parameters)
+
+        """CONFIGURACION DE LAS TRANSFORMACIONES"""
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
 
         self.bridge = CvBridge()
 
-        # Listas para almacenar coordenadas y posiciones del EE a la base 
-        self.R_gripper2base = []
-        self.t_gripper2base = []
-
-        # Listas para almacenar coordenadas y posiciones de la camara respecto al ArUco
-        self.R_target2cam = []
-        self.t_target2cam = []
-
-        # Suscripcion al topico publicador de la camara
+        """CONFIGURACION DE LA SUSCRIPCION"""
         rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback)
 
-        # Configuracion del ArUco 
-        self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250)
-        self.parameters = cv2.aruco.DetectorParameters()
-        self.detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.parameters)
-
-        # Cargar calibracion intrinseca de la camara
-        data = np.load(f"{self.path}/camera_final_calibration.npz")
-        self.camera_matrix = data['camera_matrix']
-        self.dist_coeffs = data['dist_coeffs']
-
-        # Hilo paralelo para capturar Enter del usuario
+        """CONFIGURACION DEL HILO DE ENTRADA"""
         self.input_thread = threading.Thread(target=self.wait_for_input)
         self.input_thread.daemon = True
         self.input_thread.start()
@@ -73,9 +85,8 @@ class HandEyeCalibration:
             self.ready_to_capture = True
 
 
-    # Funcion para detectar ArUco
+    # Funcion para detectar ArUco por medio de la lectura de la camara
     def image_callback(self, msg):
-        size = 0.045  # tamaño del marcador en metros
         try:
             # Conversion de imagen a escala de grises
             cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
@@ -85,18 +96,39 @@ class HandEyeCalibration:
             corners, ids, rejected = self.detector.detectMarkers(gray)
 
             if ids is not None:
-                # Devuelve vector de rotacion y traslacion del marcador respecto a la camara
+                # Devuelve vector de rotacion y traslacion del marcador respecto a la camara para cada celda
                 rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(
-                    corners, size, self.camera_matrix, self.dist_coeffs)
+                    corners, self.size, self.camera_matrix, self.dist_coeffs)
 
                 # Dibujar los marcadores detectados
                 cv2.aruco.drawDetectedMarkers(cv_image, corners, ids)
                 for r, t in zip(rvec, tvec):
-                    cv2.drawFrameAxes(cv_image, self.camera_matrix, self.dist_coeffs, r, t, size)
+                    cv2.drawFrameAxes(cv_image, self.camera_matrix, self.dist_coeffs, r, t, self.size)
+
+                # Promediar sobre todos los marcadores detectados ---
+                R_matrices = []
+                t_vectors = []
 
                 # Convertir a matriz de rotacion y vector de traslacion
-                R_cam_marker, _ = cv2.Rodrigues(rvec[0])
-                t_cam_marker = tvec[0].reshape(3, 1)
+                for r, t in zip(rvec, tvec):
+                    R, _ = cv2.Rodrigues(r)
+                    R_matrices.append(R)
+                    t_vectors.append(t.reshape(3, 1))
+
+                # Promedio de traslaciones (directo, es valido)
+                t_cam_marker = np.mean(t_vectors, axis=0)
+
+                # Promedio de rotaciones via SVD en SO(3)
+                R_sum = np.zeros((3, 3))
+                for R in R_matrices:
+                    R_sum += R
+                U, _, Vt = np.linalg.svd(R_sum / len(R_matrices))
+                R_cam_marker = U @ Vt  # Proyectar al grupo SO(3)
+
+                # Verificar que sea rotacion propia (det = +1, no reflexion)
+                if np.linalg.det(R_cam_marker) < 0:
+                    U[:, -1] *= -1
+                    R_cam_marker = U @ Vt
 
                 # Solo captura si el usuario presiono ENTER
                 if self.ready_to_capture:
@@ -170,10 +202,9 @@ class HandEyeCalibration:
         T[0:3, 0:3] = R_cam2ee
         T[0:3, 3] = t_cam2ee.reshape(3)
 
-        print("Resultado T_ee_cam:\n", T)
+        self.quat = tf_conversions.transformations.quaternion_from_matrix(T)
 
-        # Publicar resultado como TF
-        self.publish_static_tf(T)
+        print("Resultado T_ee_cam:\n", T)
 
         # Guardar resultado en archivo YAML
         self.save_calibration(T)
@@ -188,33 +219,6 @@ class HandEyeCalibration:
 
         # Termina el proceso de calibracion
         rospy.signal_shutdown("Calibracion completada")
-
-
-    # Funcion para publicar resultado en ROS 
-    def publish_static_tf(self, T):
-        br = tf2_ros.StaticTransformBroadcaster()
-        t = TransformStamped()
-
-        t.header.stamp = rospy.Time.now()
-        t.header.frame_id = self.ee_frame
-        t.child_frame_id = "camera_calibrated"
-
-        # Traslacion
-        t.transform.translation.x = T[0, 3]
-        t.transform.translation.y = T[1, 3]
-        t.transform.translation.z = T[2, 3]
-
-        # Rotacion
-        self.quat = tf_conversions.transformations.quaternion_from_matrix(T)
-        quat = self.quat
-
-        t.transform.rotation.x = quat[0]
-        t.transform.rotation.y = quat[1]
-        t.transform.rotation.z = quat[2]
-        t.transform.rotation.w = quat[3]
-
-        br.sendTransform(t)
-        print("TF calibrado publicado.")
 
     # Funcion para guardar resultado en un archivo YAML
     def save_calibration(self, T):
@@ -240,4 +244,4 @@ class HandEyeCalibration:
 
 
 if __name__ == "__main__":
-    HandEyeCalibration()
+    HandEyeCalibration(n_captures=20)
