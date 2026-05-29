@@ -6,7 +6,7 @@
 
   <node name="segmentation_node"
         pkg="statemachine"
-        type="segmentation_sam3.py"
+        type="segmentation_sam3_single_piece.py"
         output="screen"
         launch-prefix="$(arg py_path)">
 
