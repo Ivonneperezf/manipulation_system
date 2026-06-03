@@ -109,6 +109,9 @@ class KinovaVisionSAM3:
             size_ratio_min=3.0,
         )
 
+        # Fracción del grupo usada como candidatos centrales (0.30 = top 30%)
+        self.CENTER_FRACTION = 0.30
+
         self.is_processing = False
 
         rospy.loginfo("Cargando SAM3...")
@@ -160,11 +163,8 @@ class KinovaVisionSAM3:
 
     def _normalize_image(self, frame_bgr: np.ndarray) -> np.ndarray:
         """
-        CLAHE en el canal L de LAB — mejora el contraste local entre cubitos
+        CLAHE en el canal L de LAB: mejora el contraste local entre cubitos
         sin importar si la luz es fuerte, tenue o lateral.
-        Parámetros:
-          clipLimit=2.0   : cuánto amplificar el contraste (2-3 es seguro)
-          tileGridSize=8x8: tamaño de las regiones locales
         El frame_bgr original NO se toca; se usa solo para visualización.
         """
         lab = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2LAB)
@@ -173,7 +173,56 @@ class KinovaVisionSAM3:
         l_eq = clahe.apply(l)
         lab_eq = cv2.merge([l_eq, a, b])
         return cv2.cvtColor(lab_eq, cv2.COLOR_LAB2BGR)
-    
+
+    def _select_target(self,
+                       all_clean_masks: List[np.ndarray],
+                       z_values: List[float],
+                       img_w: int,
+                       img_h: int) -> int:
+        """
+        Criterio de selección del cubito objetivo:
+          1. Calcular el centroide en píxeles de cada máscara.
+          2. Calcular el centro de masa del grupo completo.
+          3. Ordenar todos los cubitos por distancia a ese centro.
+          4. Tomar el top CENTER_FRACTION (mínimo 1) más centrados.
+          5. De esos candidatos, elegir el de menor Z (más cercano a la cámara).
+
+        Robusto ante:
+          - Un solo cubito          → n_candidatos=1, se toma directamente.
+          - Cubitos muy separados   → no hay radio fijo, siempre hay candidatos.
+          - Cubitos en la orilla    → quedan fuera del top central.
+        """
+        n = len(all_clean_masks)
+
+        # ── Centroides en píxeles ──────────────────────────────────────
+        centroids_uv = []
+        for mask_bool in all_clean_masks:
+            mask_uint8 = mask_bool.astype(np.uint8)
+            mask_h, mask_w = mask_uint8.shape
+            M = cv2.moments(mask_uint8)
+            if M["m00"] == 0:
+                centroids_uv.append((img_w / 2.0, img_h / 2.0))
+                continue
+            u = M["m10"] / M["m00"] * img_w / mask_w
+            v = M["m01"] / M["m00"] * img_h / mask_h
+            centroids_uv.append((u, v))
+
+        centroids_arr = np.array(centroids_uv)          # (N, 2)
+        group_center  = centroids_arr.mean(axis=0)      # (u_mean, v_mean)
+        dists         = np.linalg.norm(centroids_arr - group_center, axis=1)
+
+        # ── Caso trivial: un solo cubito ───────────────────────────────
+        if n == 1:
+            return 0
+
+        # ── Top CENTER_FRACTION más centrados ──────────────────────────
+        n_candidatos = max(1, int(n * self.CENTER_FRACTION))
+        candidatos   = np.argsort(dists)[:n_candidatos].tolist()
+
+        # ── De esos, el menor Z ────────────────────────────────────────
+        z_candidatos = [z_values[i] for i in candidatos]
+        return candidatos[int(np.argmin(z_candidatos))]
+
     def _process_frame(self, msg: Image) -> None:
         frame_rgb = ros_numpy.numpify(msg)
         frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
@@ -191,14 +240,13 @@ class KinovaVisionSAM3:
         all_original_indices: List[int]   = []
         target_result = None
 
-        #Recopilar y filtrar todas las máscaras
+        # ── 1. Recopilar y filtrar todas las máscaras ──────────────────
         for result in results:
             if result.masks is None:
                 continue
 
             raw_masks = result.masks.data.cpu().numpy()
 
-            # DEBUG — muestra cuántas pasan cada etapa del filtro
             after_basic, after_idx = self.mask_filter._basic_filter(raw_masks, img_area)
             after_clean, after_clean_idx = self.mask_filter._remove_containing_masks(
                 after_basic, after_idx
@@ -214,7 +262,7 @@ class KinovaVisionSAM3:
                 all_original_indices.append(idx)
                 target_result = result
 
-        #Seleccionar el cubito más cercano (menor Z)
+        # ── 2. Verificar que hay máscaras ──────────────────────────────
         if not all_clean_masks:
             rospy.logwarn_throttle(3, "No se detectaron cubitos en este frame.")
             cv2.imshow("SAM3 Segmentation", frame_bgr)
@@ -223,29 +271,28 @@ class KinovaVisionSAM3:
 
         rospy.loginfo(f"Cubitos candidatos tras filtro: {len(all_clean_masks)}")
 
-        # Calcular profundidad de cada máscara
+        # ── 3. Calcular Z de cada máscara ──────────────────────────────
         z_values: List[float] = []
         for mask_bool in all_clean_masks:
             mask_uint8 = mask_bool.astype(np.uint8)
             z = self.get_depth_from_mask(mask_uint8, frame_bgr.shape)
             z_values.append(z if z > 0.0 else float("inf"))
 
-        target_idx = int(np.argmin(z_values))   # el más cercano
+        # ── 4. Seleccionar objetivo: más centrado + menor Z ────────────
+        target_idx = self._select_target(all_clean_masks, z_values, img_w, img_h)
 
-        # Si ninguna máscara tuvo profundidad válida, advertir y salir
         if z_values[target_idx] == float("inf"):
-            rospy.logwarn("Ningún cubito tiene profundidad válida en este frame.")
+            rospy.logwarn("El cubito objetivo no tiene profundidad válida.")
             cv2.imshow("SAM3 Segmentation", frame_bgr)
             cv2.waitKey(1)
             return
 
-        # Extraer datos del cubito ganador
-        mask_bool = all_clean_masks[target_idx]
-        orig_idx  = all_original_indices[target_idx]
-        z_m       = z_values[target_idx]
-
-        mask_uint8       = mask_bool.astype(np.uint8)
-        mask_h, mask_w   = mask_uint8.shape
+        # ── 5. Extraer datos del cubito ganador ────────────────────────
+        mask_bool      = all_clean_masks[target_idx]
+        orig_idx       = all_original_indices[target_idx]
+        z_m            = z_values[target_idx]
+        mask_uint8     = mask_bool.astype(np.uint8)
+        mask_h, mask_w = mask_uint8.shape
 
         # Nombre de clase
         if (
@@ -275,12 +322,12 @@ class KinovaVisionSAM3:
         x_c = (u - self.cx) * z_m / self.fx
         y_c = (v - self.cy) * z_m / self.fy
 
-        #Visualización
+        # ── 6. Visualización ───────────────────────────────────────────
         mask_resized = cv2.resize(mask_uint8, (img_w, img_h), interpolation=cv2.INTER_NEAREST)
         contours, _  = cv2.findContours(mask_resized, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        cv2.drawContours(frame_bgr, contours, -1, (0, 255, 0), 3)   # contorno verde
-        cv2.circle(frame_bgr, (u, v), 8, (0, 0, 255), -1)           # centroide rojo
+        cv2.drawContours(frame_bgr, contours, -1, (0, 255, 0), 3)
+        cv2.circle(frame_bgr, (u, v), 8, (0, 0, 255), -1)
         cv2.putText(
             frame_bgr,
             f"TARGET: {obj_name} ({x_c:.3f}, {y_c:.3f}, {z_m:.3f})",
@@ -288,7 +335,7 @@ class KinovaVisionSAM3:
             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2,
         )
 
-        #Publicar y mostrar
+        # ── 7. Publicar y mostrar ──────────────────────────────────────
         self._publish_centroid(x_c, y_c, z_m)
 
         cv2.imshow("SAM3 Segmentation", frame_bgr)
@@ -336,8 +383,7 @@ class KinovaVisionSAM3:
         msg.header.frame_id = self.cam_frame
         msg.point.x, msg.point.y, msg.point.z = x, y, z
         self.pub.publish(msg)
-        rospy.loginfo(f"[PICK] Cubito más cercano → X={x:.3f} Y={y:.3f} Z={z:.3f}")
-
+        rospy.loginfo(f"[PICK] TARGET → X={x:.3f} Y={y:.3f} Z={z:.3f}")
 
 if __name__ == "__main__":
     try:

@@ -16,6 +16,9 @@ class KinovaVisionD415:
         rospy.init_node('vision_simulation')
         # Creacion de publiser de punto final refrente a la camara
         self.pub = rospy.Publisher('/object_centroid', PointStamped, queue_size=10)
+        
+        # NUEVO: Publisher para visualizar la máscara filtrada en RViz
+        self.mask_pub = rospy.Publisher('/object_mask_filtered', Image, queue_size=1)
 
         # Cargamos topicos por defecto de simulacion
         self.TOPIC_RGB = rospy.get_param("~topics/rgb_topic", "/d415/color/image_raw")
@@ -97,6 +100,20 @@ class KinovaVisionD415:
         # Conservamos solo los puntos que caen dentro de la mascara
         in_mask = mask[v_mask, u_mask] > 0
         z_masked = z_arr[in_mask]
+
+        # NUEVO: Generar y publicar una máscara visual que solo contenga los puntos validados por la nube
+        # Creamos una imagen en negro del mismo tamaño que la máscara original
+        filtered_mask_visual = np.zeros_like(mask, dtype=np.uint8)
+        if len(z_masked) > 0:
+            # Los píxeles que pasaron todos los filtros y tienen profundidad válida se pintan de blanco (255)
+            filtered_mask_visual[v_mask[in_mask], u_mask[in_mask]] = 255
+        
+        # Convertimos la matriz de OpenCV/NumPy a mensaje de ROS tipo sensor_msgs/Image
+        # Se usa codificación 'mono8' al ser una imagen en escala de grises de 8 bits
+        mask_msg = ros_numpy.msgify(Image, filtered_mask_visual, encoding='mono8')
+        mask_msg.header.stamp = rospy.Time.now()
+        mask_msg.header.frame_id = self.cam_frame
+        self.mask_pub.publish(mask_msg)
 
         # En caso de no haber puntos retornamos fallo
         if len(z_masked) == 0:
