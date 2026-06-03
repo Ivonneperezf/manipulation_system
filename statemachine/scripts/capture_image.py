@@ -3,13 +3,9 @@
 capture_image.py
 ----------------
 Nodo ROS Noetic que se suscribe al tópico /camera/image_raw.
-Mantiene siempre el último frame en memoria.
+Mantiene siempre el último frame en memoria y lo muestra en pantalla.
 Al presionar Enter en la terminal, pide un nombre y guarda la imagen.
 Se puede capturar múltiples veces; escribe 'salir' para cerrar el nodo.
-
-Uso:
-    rosrun <tu_paquete> capture_image.py [directorio_destino]
-    rosrun <tu_paquete> capture_image.py _save_dir:=/ruta/destino
 """
 
 import os
@@ -30,14 +26,14 @@ class ImageCapture:
         self.last_frame = None          # último frame recibido
         self.lock       = threading.Lock()
 
-        topic = rospy.get_param("~topic", "/camera/image_raw")
+        topic = rospy.get_param("~topic", "/camera/color/image_raw")
         rospy.loginfo(f"Suscrito a:            {topic}")
         rospy.loginfo(f"Directorio de guardado: {self.save_dir}")
         rospy.loginfo("Presiona Enter para capturar | escribe 'salir' para terminar\n")
 
         self.sub = rospy.Subscriber(topic, Image, self._cb_image, queue_size=1)
 
-        # Hilo dedicado a la interacción con el usuario
+        # Hilo dedicado a la interacción con el usuario (terminal)
         self._input_thread = threading.Thread(target=self._input_loop, daemon=True)
         self._input_thread.start()
 
@@ -84,7 +80,7 @@ class ImageCapture:
                 rospy.logwarn("⚠  Nombre vacío, captura cancelada.")
                 continue
 
-            # Sanitizar nombre (evitar caracteres problemáticos)
+            # Sanitizar nombre
             nombre = "".join(c if c.isalnum() or c in "-_." else "_" for c in nombre)
 
             filepath = os.path.join(self.save_dir, f"{nombre}.png")
@@ -103,7 +99,23 @@ class ImageCapture:
 
     # ------------------------------------------------------------------
     def spin(self):
-        rospy.spin()
+        """Ciclo principal en el hilo principal para actualizar la ventana de OpenCV."""
+        rate = rospy.Rate(30) # 30 FPS para refrescar la ventana
+        
+        while not rospy.is_shutdown():
+            with self.lock:
+                frame = self.last_frame.copy() if self.last_frame is not None else None
+
+            if frame is not None:
+                # Mostrar la imagen en una ventana de OpenCV
+                cv2.imshow("Vista en Vivo (Presiona Enter en terminal)", frame)
+            
+            # cv2.waitKey(1) es OBLIGATORIO para que la ventana procese los gráficos
+            cv2.waitKey(1)
+            rate.sleep()
+        
+        # Al salir, destruir las ventanas de OpenCV de forma limpia
+        cv2.destroyAllWindows()
 
 
 # ======================================================================

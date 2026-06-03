@@ -1,0 +1,9 @@
+<launch>
+  <!-- Nodo para la captura de imágenes desde la cámara -->
+  <node pkg="statemachine" type="capture_image.py" name="capture_image" output="screen">
+    
+    <!-- Solución al conflicto de libffi_base_7.0 en el entorno virtual -->
+    <env name="LD_PRELOAD" value="/usr/lib/x86_64-linux-gnu/libffi.so.7" />
+    
+  </node>
+</launch>
