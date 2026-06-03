@@ -14,5 +14,7 @@ catkin_install_python(PROGRAMS
   scripts/handeye_matrix_node.py
   scripts/hand_eye_calibration.py
   scripts/calibration_d415.py
+  scripts/validacion.py
+  scripts/transformada_prueba.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
