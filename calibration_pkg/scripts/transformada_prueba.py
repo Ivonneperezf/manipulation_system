@@ -2,7 +2,7 @@
 """
 Script de prueba para verificar transformadas TF del robot.
 Equivalente en terminal:
-    rosrun tf tf_echo base_link j2s7s300_link_7
+    rosrun tf tf_echo m1n6s300_link_base m1n6s300_link_5
 """
 
 import rospy
@@ -17,8 +17,8 @@ def test_tf_transform():
     tf_buffer   = tf2_ros.Buffer()
     tf_listener = tf2_ros.TransformListener(tf_buffer)  # noqa: F841
 
-    base_frame = 'base_link'
-    ee_frame   = 'j2s7s300_link_7'  # Cambia segun tu robot
+    base_frame = 'm1n6s300_link_base'
+    ee_frame   = 'm1n6s300_link_5'  # Cambia segun tu robot
 
     rospy.loginfo(f"Esperando transformada: {base_frame} -> {ee_frame}")
     rospy.sleep(1.0)  # Dar tiempo al buffer para llenarse

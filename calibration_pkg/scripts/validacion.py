@@ -49,12 +49,15 @@ import cv2
 import threading
 from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
+import rospkg as rp
 
 
 # ==============================================================================
 # CONFIGURACION: Ajusta estas rutas y parametros a tu setup
 # ==============================================================================
-PATH_NPZ   = "/ruta/a/tu/paquete/config/handeye_result.npz"
+rospack = rp.RosPack()
+path_pkg = rospack.get_path("calibration_pkg") 
+PATH_NPZ   = f"{path_pkg}/config/handeye_result.npz"
 BASE_FRAME = "m1n6s300_link_base"
 EE_FRAME   = "m1n6s300_link_5"
 ARUCO_SIZE = 0.045  # Tamanio del marcador en metros (debe coincidir con el real)
