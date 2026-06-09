@@ -23,17 +23,17 @@ class Home(smach.State):
         self.use_sim = rospy.get_param('~use_sim', True)
 
         # Definicion de pose HOME cartesiana
-        # self.home_pose = PointStamped()
-        # self.home_pose.point.x = 0.434
-        # self.home_pose.point.y = -0.002
-        # self.home_pose.point.z = 0.362
+        self.home_pose = PointStamped()
+        self.home_pose.point.x = -2.943
+        self.home_pose.point.y = -0.027
+        self.home_pose.point.z = -2.638
 
         # Definición de pose HOME articular (en radianes)
         self.home_joint_goal_simulation = Float64MultiArray()
         self.home_joint_goal_simulation.data = [-3.1917, 3.8806, 2.9837, -1.4455, 3.1411, -2.4153]
         self.home_joint_goal = Float64MultiArray()
-        # self.home_joint_goal.data = [5.459746550771446, 3.660275500131915, 2.207720329943228, 5.587832881295461, 1.870707946638061, 2.3938779533008567]
-        self.home_joint_goal.data = [4.094269291377299, 3.3711478184908077, 2.1719462201782482, 5.457468482774992, 2.170500523180499, 2.1681103361021528]
+        self.home_joint_goal.data = [4.06356970191141, 3.3038859567353307, 2.259471675193975, 5.08504457908726, 2.563036086788292, 2.0200945058766386]
+        #self.home_joint_goal.data = [4.094269291377299, 3.3711478184908077, 2.1719462201782482, 5.457468482774992, 2.170500523180499, 2.1681103361021528]
 
     def execute(self, userdata):
         rospy.loginfo("Ejecutando estado: HOME")
