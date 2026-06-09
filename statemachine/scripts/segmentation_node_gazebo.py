@@ -8,6 +8,9 @@ from sensor_msgs.msg import Image, CameraInfo, PointCloud2
 from geometry_msgs.msg import PointStamped
 from ultralytics import YOLO, SAM
 import sensor_msgs.point_cloud2 as pc2
+import std_msgs.msg
+import struct
+from sensor_msgs.msg import PointField
 
 class KinovaVisionD415:
 
@@ -18,8 +21,7 @@ class KinovaVisionD415:
         self.pub = rospy.Publisher('/object_centroid', PointStamped, queue_size=10)
         
         # NUEVO: Publisher para visualizar la máscara filtrada en RViz
-        self.mask_pub = rospy.Publisher('/object_mask_filtered', Image, queue_size=1)
-
+        self.pc_pub = rospy.Publisher('/object_pointcloud', PointCloud2, queue_size=10)
         # Cargamos topicos por defecto de simulacion
         self.TOPIC_RGB = rospy.get_param("~topics/rgb_topic", "/d415/color/image_raw")
         self.TOPIC_INFO = rospy.get_param("~topics/camera_info_topic", "/d415/color/camera_info")
@@ -105,15 +107,28 @@ class KinovaVisionD415:
         # Creamos una imagen en negro del mismo tamaño que la máscara original
         filtered_mask_visual = np.zeros_like(mask, dtype=np.uint8)
         if len(z_masked) > 0:
-            # Los píxeles que pasaron todos los filtros y tienen profundidad válida se pintan de blanco (255)
-            filtered_mask_visual[v_mask[in_mask], u_mask[in_mask]] = 255
-        
-        # Convertimos la matriz de OpenCV/NumPy a mensaje de ROS tipo sensor_msgs/Image
-        # Se usa codificación 'mono8' al ser una imagen en escala de grises de 8 bits
-        mask_msg = ros_numpy.msgify(Image, filtered_mask_visual, encoding='mono8')
-        mask_msg.header.stamp = rospy.Time.now()
-        mask_msg.header.frame_id = self.cam_frame
-        self.mask_pub.publish(mask_msg)
+            u_valid = u_mask[in_mask]
+            v_valid = v_mask[in_mask]
+            z_valid = z_arr[in_mask]
+
+            rospy.loginfo(f"DEBUG PC: in_mask sum={in_mask.sum()}, z_masked len={len(z_masked)}")
+
+            pts = []
+            for u_p, v_p, z_p in zip(u_valid, v_valid, z_valid):
+                X = (u_p * img_w / mask_w - self.cx) * z_p / self.fx
+                Y = (v_p * img_h / mask_h - self.cy) * z_p / self.fy
+                pts.append([X, Y, z_p])
+
+            fields = [
+                PointField('x', 0,  PointField.FLOAT32, 1),
+                PointField('y', 4,  PointField.FLOAT32, 1),
+                PointField('z', 8,  PointField.FLOAT32, 1),
+            ]
+            header = std_msgs.msg.Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = self.cam_frame
+            cloud_msg = pc2.create_cloud(header, fields, pts)
+            self.pc_pub.publish(cloud_msg)
 
         # En caso de no haber puntos retornamos fallo
         if len(z_masked) == 0:
