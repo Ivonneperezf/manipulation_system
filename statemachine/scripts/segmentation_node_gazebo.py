@@ -35,14 +35,14 @@ class KinovaVisionD415:
         self.sam = SAM(package_path  + '/weights/sam2_b.pt')
 
         # Obtenemos parámetros intrínsecos de la cámara desde el tópico de info
-        rospy.loginfo("Sincronizando con cámara Gazebo D415...")
+        rospy.loginfo("Sincronizando con camara...")
         try:
             info = rospy.wait_for_message(self.TOPIC_INFO, CameraInfo, timeout=10)
             self.fx, self.fy = info.K[0], info.K[4]
             self.cx, self.cy = info.K[2], info.K[5]
             self.cam_frame   = info.header.frame_id
         except rospy.ROSException:
-            rospy.logerr("No se detectó la cámara. Revisa que Gazebo esté corriendo.")
+            rospy.logerr("No se detectó la cámara. Revisa que los topicos esten habilitados esté corriendo.")
             return
 
         # Variables para callbacks
@@ -103,9 +103,7 @@ class KinovaVisionD415:
         in_mask = mask[v_mask, u_mask] > 0
         z_masked = z_arr[in_mask]
 
-        # NUEVO: Generar y publicar una máscara visual que solo contenga los puntos validados por la nube
-        # Creamos una imagen en negro del mismo tamaño que la máscara original
-        filtered_mask_visual = np.zeros_like(mask, dtype=np.uint8)
+        #Generar y publicar una máscara visual que solo contenga los puntos validados por la nube
         if len(z_masked) > 0:
             u_valid = u_mask[in_mask]
             v_valid = v_mask[in_mask]
