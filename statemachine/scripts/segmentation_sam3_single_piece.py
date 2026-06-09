@@ -11,7 +11,9 @@ from geometry_msgs.msg import PointStamped
 from ultralytics.models.sam import SAM3SemanticPredictor
 import sensor_msgs.point_cloud2 as pc2
 from typing import List, Tuple, Optional
-
+from sensor_msgs.msg import Image, CameraInfo, PointCloud2, PointField
+import std_msgs.msg
+import struct
 
 class MaskFilter:
     """
@@ -90,10 +92,15 @@ class KinovaVisionSAM3:
     def __init__(self):
         rospy.init_node("vision_d415_sam3")
         self.pub = rospy.Publisher("object_centroid", PointStamped, queue_size=10)
+        #Publisher para visualizar la máscara filtrada en RViz
+        self.pc_pub = rospy.Publisher('/object_pointcloud', PointCloud2, queue_size=10)
 
         self.TOPIC_RGB    = rospy.get_param("~topics/rgb_topic",         "/d415/color/image_raw")
         self.TOPIC_INFO   = rospy.get_param("~topics/camera_info_topic", "/d415/color/camera_info")
         self.TOPIC_POINTS = rospy.get_param("~topics/points_topic",      "/d415/depth/points")
+
+        #Topico para procesamiento
+        self.TOPIC_FLAG   = rospy.get_param("~topics/segmentation_flag", "segmentation_flag")
 
         self.prompts = ["a small cube of fruit"]
 
@@ -287,9 +294,18 @@ class KinovaVisionSAM3:
 
         #Calcular Z de cada máscara
         z_values: List[float] = []
+        z_masked_list = []
+        in_mask_list = []
+        z_arr_list = []
+        u_mask_list = []
+        v_mask_list = []
         for mask_bool in all_clean_masks:
             mask_uint8 = mask_bool.astype(np.uint8)
-            z = self.get_depth_from_mask(mask_uint8, frame_bgr.shape)
+            z_masked_func, u_valid_func, v_valid_func = self.get_depth_from_mask(mask_uint8, frame_bgr.shape)
+            z_masked_list.append(z_masked_func)
+            u_mask_list.append(u_valid_func)
+            v_mask_list.append(v_valid_func)
+            z = float(np.mean(z_masked_func))
             z_values.append(z if z > 0.0 else float("inf"))
 
         #Selección adaptativa
@@ -305,6 +321,9 @@ class KinovaVisionSAM3:
         mask_bool      = all_clean_masks[target_idx]
         orig_idx       = all_original_indices[target_idx]
         z_m            = z_values[target_idx]
+        z_masked   = z_masked_list[target_idx]
+        u_mask_arr = u_mask_list[target_idx]
+        v_mask_arr = v_mask_list[target_idx]
         mask_uint8     = mask_bool.astype(np.uint8)
         mask_h, mask_w = mask_uint8.shape
 
@@ -358,44 +377,63 @@ class KinovaVisionSAM3:
         #Publicar y mostrar
         self._publish_centroid(x_c, y_c, z_m)
 
+        # Empaca el color magenta una sola vez fuera del loop
+        r, g, b = 255, 0, 255
+        rgb_packed = struct.unpack('f', struct.pack('BBBB', b, g, r, 0))[0]
+
+        # El bloque de publicación queda limpio:
+        if len(z_masked) > 0:
+            pts = []
+            for u_p, v_p, z_p in zip(u_mask_arr, v_mask_arr, z_masked):
+                X = (u_p * img_w / mask_w - self.cx) * z_p / self.fx
+                Y = (v_p * img_h / mask_h - self.cy) * z_p / self.fy
+                pts.append([X, Y, z_p, rgb_packed])
+
+            fields = [
+                PointField('x',   0,  PointField.FLOAT32, 1),
+                PointField('y',   4,  PointField.FLOAT32, 1),
+                PointField('z',   8,  PointField.FLOAT32, 1),
+                PointField('rgb', 12, PointField.FLOAT32, 1),  # ← campo nuevo
+            ]
+            header = std_msgs.msg.Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = self.cam_frame
+            cloud_msg = pc2.create_cloud(header, fields, pts)
+            self.pc_pub.publish(cloud_msg)
         cv2.imshow("SAM3 Segmentation", frame_bgr)
         cv2.waitKey(1)
 
     def get_depth_from_mask(self, mask: np.ndarray, frame_shape: Tuple[int, int, int]) -> float:
         if self.last_cloud is None:
             return 0.0
-
         mask_h, mask_w = mask.shape
         img_h, img_w   = frame_shape[:2]
-        points_3d      = self.last_cloud.copy()
-
-        valid     = points_3d[:, 2] > 0
+        points_3d = self.last_cloud
+        valid = points_3d[:, 2] > 0
         points_3d = points_3d[valid]
         if len(points_3d) == 0:
             return 0.0
-
         u_arr = (points_3d[:, 0] * self.fx / points_3d[:, 2] + self.cx).astype(np.int32)
         v_arr = (points_3d[:, 1] * self.fy / points_3d[:, 2] + self.cy).astype(np.int32)
-
+        rospy.loginfo_throttle(2, f"DEBUG: u rango=[{u_arr.min()},{u_arr.max()}] v rango=[{v_arr.min()},{v_arr.max()}] | img limites w={img_w} h={img_h}")
         in_bounds = (u_arr >= 0) & (u_arr < img_w) & (v_arr >= 0) & (v_arr < img_h)
-        u_arr, v_arr = u_arr[in_bounds], v_arr[in_bounds]
+        u_arr = u_arr[in_bounds]
+        v_arr = v_arr[in_bounds]
         z_arr = points_3d[in_bounds, 2]
-
-        u_mask_idx = (u_arr * mask_w / img_w).astype(np.int32)
-        v_mask_idx = (v_arr * mask_h / img_h).astype(np.int32)
-
-        in_bounds2 = (
-            (u_mask_idx >= 0) & (u_mask_idx < mask_w) &
-            (v_mask_idx >= 0) & (v_mask_idx < mask_h)
-        )
-        u_mask_idx = u_mask_idx[in_bounds2]
-        v_mask_idx = v_mask_idx[in_bounds2]
-        z_arr      = z_arr[in_bounds2]
-
-        in_mask  = mask[v_mask_idx, u_mask_idx] > 0
+        u_mask = (u_arr * mask_w / img_w).astype(np.int32)
+        v_mask = (v_arr * mask_h / img_h).astype(np.int32)
+        in_bounds2 = (u_mask >= 0) & (u_mask < mask_w) & (v_mask >= 0) & (v_mask < mask_h)
+        u_mask = u_mask[in_bounds2]
+        v_mask = v_mask[in_bounds2]
+        z_arr  = z_arr[in_bounds2]
+        in_mask = mask[v_mask, u_mask] > 0
         z_masked = z_arr[in_mask]
-
-        return float(np.mean(z_masked)) if len(z_masked) > 0 else 0.0
+        
+        if len(z_masked) == 0:
+            return 0.0
+        u_valid = u_mask[in_mask]
+        v_valid = v_mask[in_mask]
+        return z_masked, u_valid, v_valid
 
     def _publish_centroid(self, x: float, y: float, z: float) -> None:
         msg = PointStamped()
