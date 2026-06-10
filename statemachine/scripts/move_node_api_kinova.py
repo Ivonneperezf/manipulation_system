@@ -38,6 +38,7 @@ class MoveNodeKinova():
         self.currentJointCommand = [0.0]*7
         self.pose_value = []
         self.currentCartesianCommand = [0.0] * 7
+        self.OFFSET = 0.15
         # Inicializamos el nodo 
         rospy.init_node('move_node_kinova')
 
@@ -56,7 +57,8 @@ class MoveNodeKinova():
         self.getcurrentCartesianCommand()  # Obtenemos la posición actual del robot antes de enviar el comando
         orientation_q = self.EulerXYZ2Quaternion(self.currentCartesianCommand[3:])
         rospy.loginfo(f"orientacion {orientation_q}")
-        self.pose_value = [msg.point.x, msg.point.y, msg.point.z] + orientation_q
+        self.pose_value = [msg.point.x, msg.point.y, (msg.point.z+self.OFFSET)] + orientation_q
+        rospy.loginfo(f"Pose enviada {self.pose_value}")
         try:
 
             poses = [float(n) for n in self.pose_value]
