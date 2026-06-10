@@ -305,7 +305,7 @@ class KinovaVisionSAM3:
             z_masked_list.append(z_masked_func)
             u_mask_list.append(u_valid_func)
             v_mask_list.append(v_valid_func)
-            z = float(np.mean(z_masked_func))
+            z = float(np.mean(z_masked_func)) if len(z_masked_func) > 0 else 0.0
             z_values.append(z if z > 0.0 else float("inf"))
 
         #Selección adaptativa
@@ -405,14 +405,14 @@ class KinovaVisionSAM3:
 
     def get_depth_from_mask(self, mask: np.ndarray, frame_shape: Tuple[int, int, int]) -> float:
         if self.last_cloud is None:
-            return 0.0
+            return np.array([]), np.array([]), np.array([])
         mask_h, mask_w = mask.shape
         img_h, img_w   = frame_shape[:2]
         points_3d = self.last_cloud
         valid = points_3d[:, 2] > 0
         points_3d = points_3d[valid]
         if len(points_3d) == 0:
-            return 0.0
+            return np.array([]), np.array([]), np.array([])
         u_arr = (points_3d[:, 0] * self.fx / points_3d[:, 2] + self.cx).astype(np.int32)
         v_arr = (points_3d[:, 1] * self.fy / points_3d[:, 2] + self.cy).astype(np.int32)
         rospy.loginfo_throttle(2, f"DEBUG: u rango=[{u_arr.min()},{u_arr.max()}] v rango=[{v_arr.min()},{v_arr.max()}] | img limites w={img_w} h={img_h}")
@@ -430,7 +430,7 @@ class KinovaVisionSAM3:
         z_masked = z_arr[in_mask]
         
         if len(z_masked) == 0:
-            return 0.0
+            return np.array([]), np.array([]), np.array([])
         u_valid = u_mask[in_mask]
         v_valid = v_mask[in_mask]
         return z_masked, u_valid, v_valid
