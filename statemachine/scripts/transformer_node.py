@@ -54,6 +54,9 @@ class KinovaTransformer:
         rospy.Subscriber('/object_centroid', PointStamped, self.callback)
         self.pub = rospy.Publisher('/object_centroid_robot', PointStamped, queue_size=10)
 
+        """Variables"""
+        self.OFFSET = 0.18
+
         rospy.loginfo("Nodo listo. Esperando puntos en /object_centroid...")
 
 
@@ -91,13 +94,8 @@ class KinovaTransformer:
             out.header.frame_id = self.base_frame
             out.point.x         = p_base[0]
             out.point.y         = p_base[1]
-            out.point.z         = p_base[2]
+            out.point.z         = p_base[2] + self.OFFSET
             self.pub.publish(out)
-
-            # Guardar en CSV para analisis posterior
-            with open(f"{self.config_path}/transform_points.csv", "a",
-                      newline="", encoding="utf-8") as f:
-                csv.writer(f).writerow([p_base[0], p_base[1], p_base[2]])
 
             rospy.loginfo_throttle(2,
                 f"p_base -> X:{p_base[0]:.3f} Y:{p_base[1]:.3f} Z:{p_base[2]:.3f}")
