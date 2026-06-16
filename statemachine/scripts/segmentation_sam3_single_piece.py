@@ -365,7 +365,7 @@ class KinovaVisionSAM3:
         else:
             obj_name = "fruit"
 
-        # Coordenadas 3D en frame de cámara
+        # Coordenadas 3D en frame de cámara en metros
         x_c = (u - self.cx) * z_m / self.fx
         y_c = (v - self.cy) * z_m / self.fy
 

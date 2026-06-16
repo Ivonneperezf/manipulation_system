@@ -25,7 +25,7 @@ from geometry_msgs.msg import PointStamped
 class KinovaTransformer:
 
     def __init__(self):
-        rospy.init_node('direct_transformer')
+        rospy.init_node('point_transform_node')
 
         """PARAMETROS DE FRAMES"""
         self.base_frame = "m1n6s300_link_base"
@@ -36,9 +36,7 @@ class KinovaTransformer:
         package_path     = rospack.get_path(rospy.get_param("~pack", "calibration_pkg"))
         self.config_path = f"{package_path}/config"
 
-        """CARGAR CALIBRACION DESDE NPZ"""
-        # Carga la matriz homogenea 4x4 resultado de la calibracion hand-eye
-        # que representa la transformada de la camara al link_5
+        """CARGAR CALIBRACION"""
         npz_path      = f"{self.config_path}/handeye_result.npz"
         data          = np.load(npz_path)
         self.T_cam2ee = data["T"]
@@ -46,7 +44,6 @@ class KinovaTransformer:
         rospy.loginfo(f"T_cam2ee:\n{np.round(self.T_cam2ee, 4)}")
 
         """CONFIGURACION TF"""
-        # Buffer para obtener la transformada del link_5 a la base en tiempo real
         self.tf_buffer   = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
@@ -59,24 +56,23 @@ class KinovaTransformer:
 
     def callback(self, msg):
         try:
-            # Obtener transformada del link_5 respecto a la base en tiempo real
+            # Obtenemos la transformada del link_5 respecto a la base en tiempo real
             trans = self.tf_buffer.lookup_transform(
                 self.base_frame,
                 self.ee_frame,
                 rospy.Time(0),
-                rospy.Duration(1.0)  # Tiempo de espera al buffer
+                rospy.Duration(1.0)
             )
-
+            # Valores de rotacion y translacion de la transformada de link_5 a la base
             t = trans.transform.translation
             q = trans.transform.rotation
 
-            # Convertir a matriz homogenea 4x4: T_base_ee
-            T_base_ee = tf_conversions.transformations.quaternion_matrix(
-                [q.x, q.y, q.z, q.w])
+            # Convertimos a matriz homogenea la transformada de link_5 a la base
+            T_base_ee = tf_conversions.transformations.quaternion_matrix([q.x, q.y, q.z, q.w])
             T_base_ee[0:3, 3] = [t.x, t.y, t.z]
 
-            # Cadena cinematica completa: camara -> link_5 -> base
-            # T_base_cam = T_base_ee @ T_ee_cam
+            """Cadena cinematica completa: camara -> link_5 -> base"""
+            # Calculamos la transformada completa de la camara a la base
             T_base_cam = T_base_ee @ self.T_cam2ee
 
             # Punto en coordenadas de la camara (homogeneo)
@@ -85,22 +81,31 @@ class KinovaTransformer:
             # Transformar al sistema de referencia de la base
             p_base = T_base_cam @ p_cam
 
+            z_ee_base    = trans.transform.translation.z  # TF
+            z_cam_objeto = msg.point.z                    # SAM3
+            Z_EE_CAM     = 0.05                           # medido físicamente (cam a ee)
+
+            # Cámara respecto a base
+            z_cam_base = z_ee_base + Z_EE_CAM
+
+            # Objeto respecto a base
+            z_objeto_base = z_cam_base - z_cam_objeto
+
+            # Offset de agarre
+            OFFSET_AGARRE = 0.18 
+            z_final = z_objeto_base + OFFSET_AGARRE
+
             # Publicar punto transformado
             out                 = PointStamped()
             out.header.stamp    = rospy.Time.now()
             out.header.frame_id = self.base_frame
             out.point.x         = p_base[0]
             out.point.y         = p_base[1]
-            out.point.z         = p_base[2]
+            out.point.z         = z_final
             self.pub.publish(out)
 
-            # Guardar en CSV para analisis posterior
-            with open(f"{self.config_path}/transform_points.csv", "a",
-                      newline="", encoding="utf-8") as f:
-                csv.writer(f).writerow([p_base[0], p_base[1], p_base[2]])
-
             rospy.loginfo_throttle(2,
-                f"p_base -> X:{p_base[0]:.3f} Y:{p_base[1]:.3f} Z:{p_base[2]:.3f}")
+                f"p_base -> X:{p_base[0]:.3f} Y:{p_base[1]:.3f} Z:{z_final:.3f}")
 
         except Exception as e:
             rospy.logwarn(f"Error en transformacion: {e}")

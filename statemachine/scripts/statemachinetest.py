@@ -62,7 +62,6 @@ class Home(smach.State):
 class Esperar_Punto(smach.State):
     def __init__ (self):
         # Bandera para indicar que debe iniciar la segmentacion
-        self.segmentation_flag = rospy.Publisher('/segmentation_flag', Bool, queue_size=10)
         smach.State.__init__(self, outcomes=['received_point'],
                              input_keys=['point_received'],
                              output_keys=['point_received']) 
@@ -70,12 +69,10 @@ class Esperar_Punto(smach.State):
     def execute(self, userdata):
         # Publicamos la bandera para iniciar la segmentacion para que se comience la segmentacion
         rospy.loginfo("Ejecutando estado: ESPERAR_PUNTO")
-        self.segmentation_flag.publish(Bool(data=True))
         # Esperamos el centroide del objeto detectado en el tópico correspondiente
         point_robot = rospy.wait_for_message('/object_centroid_robot', PointStamped)
         userdata.point_received = point_robot
         rospy.sleep(SLEEP)
-        self.segmentation_flag.publish(Bool(data=False))
         return 'received_point'
     
 class Mover_A_Punto(smach.State):
