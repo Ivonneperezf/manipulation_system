@@ -5,7 +5,7 @@
 import rospy
 import smach
 from geometry_msgs.msg import PointStamped
-from std_msgs.msg import Float64MultiArray, String, Bool
+from std_msgs.msg import Float64MultiArray, String, Bool, Float64
 
 SLEEP = 2.0
 
@@ -100,6 +100,54 @@ class Mover_A_Punto(smach.State):
         else:
             return 'Failed'
 
+class Bajar_Z(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['Done', 'Failed'],
+                             input_keys=['point_to_move']) 
+        # Nodo publicador en el tópico de movimiento
+        self.cartesian_point = rospy.Publisher('/cartesian_goal', PointStamped, queue_size=10)
+        self.OFFSET = 0.18
+        
+    def execute(self, userdata):
+        rospy.loginfo("Ejecutando estado: BAJAR_Z")
+        # Espera hasta que haya al menos un suscriptor conectado al topico
+        while self.cartesian_point.get_num_connections() == 0:
+            rospy.sleep(0.1)
+            # Si el nodo esta apagado retorna error
+            if rospy.is_shutdown(): return 'Failed'
+        rospy.loginfo("Esperando la lectura del valor de Z desde /z_value...")
+        try:
+            # Escuchamos el mensaje Float64 del nodo que lee la altura de la nube
+            z_superficie_msg = rospy.wait_for_message('/z_value', Float64, timeout=3.0)
+            z_superficie = z_superficie_msg.data
+            rospy.loginfo(f"Z de la superficie detectada: {z_superficie}")
+        except rospy.ROSException:
+            rospy.logerr("Timeout: No se recibió respuesta en el tópico /z_value")
+            return 'Failed'
+        
+        goal_pose = PointStamped()
+        goal_pose.header = userdata.point_to_move.header
+        goal_pose.header.stamp = rospy.Time.now()
+        
+        # Mantenemos las componentes X e Y intactas del objetivo inicial
+        goal_pose.point.x = userdata.point_to_move.point.x
+        goal_pose.point.y = userdata.point_to_move.point.y
+        
+        # Asignamos la nueva coordenada Z aplicando la resta con tu OFFSET
+        goal_pose.point.z = z_superficie + self.OFFSET
+        rospy.loginfo(f"Publicando punto con Z modificado: X={goal_pose.point.x}, Y={goal_pose.point.y}, Z={goal_pose.point.z}")
+        
+        # Se envia el punto recibido del centro del objeto al nodo de movimiento
+        self.cartesian_point.publish(goal_pose)
+
+        # Esoeramos a que se reciba la confirmacion de movimiento
+        status_msg = rospy.wait_for_message('/motion_done', String)
+        rospy.sleep(SLEEP)
+        if status_msg.data == "DONE":
+            return 'Done'
+        else:
+            return 'Failed'
+
 def main():
     rospy.init_node('state_machine_')
 
@@ -109,8 +157,6 @@ def main():
     # Estados y transiciones
     with sm:
         # Estado HOME
-        #smach.StateMachine.add('HOME', Home(), 
-        #                       transitions={'Done':'ESPERAR_PUNTO', 'Failed':'HOME'})
         smach.StateMachine.add('HOME', Home(), 
                                transitions={'Done':'ESPERAR_PUNTO', 'Failed':'ESPERAR_PUNTO'})
 
@@ -119,11 +165,15 @@ def main():
                                transitions={'received_point':'MOVER_A_PUNTO'},
                                remapping={'point_received':'shared_point'}) 
 
-        # Estado MOVER_A_PUNTO
+        # Estado MOVER_A_PUNTO (Cambias la transición para que vaya a BAJAR_Z en lugar de HOME)
         smach.StateMachine.add('MOVER_A_PUNTO', Mover_A_Punto(), 
-                               transitions={'Done':'HOME', 'Failed':'HOME'},
+                               transitions={'Done':'BAJAR_Z', 'Failed':'HOME'},
                                remapping={'point_to_move':'shared_point'})
 
+        # Estado BAJAR_Z (Agregado a la estructura principal)
+        smach.StateMachine.add('BAJAR_Z', Bajar_Z(),
+                               transitions={'Done':'HOME', 'Failed':'HOME'},
+                               remapping={'point_to_move':'shared_point'})
     # Ejecutamos la maquina de estados
     outcome = sm.execute()
 

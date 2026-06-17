@@ -19,7 +19,7 @@ import tf2_ros
 import tf_conversions
 import rospkg as rp
 import csv
-from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import PointStamped, Float64
 
 
 class KinovaTransformer:
@@ -50,66 +50,44 @@ class KinovaTransformer:
         """SUSCRIPTORES Y PUBLICADORES"""
         rospy.Subscriber('/object_centroid', PointStamped, self.callback)
         self.pub = rospy.Publisher('/object_centroid_robot', PointStamped, queue_size=10)
+        self.pub = rospy.Publisher('/z_value', Float64, queue_size=10)
 
         rospy.loginfo("Nodo listo. Esperando puntos en /object_centroid...")
 
 
     def callback(self, msg):
         try:
-            # Obtenemos la transformada del link_5 respecto a la base en tiempo real
             trans = self.tf_buffer.lookup_transform(
                 self.base_frame,
                 self.ee_frame,
                 rospy.Time(0),
                 rospy.Duration(1.0)
             )
-            # Valores de rotacion y translacion de la transformada de link_5 a la base
             t = trans.transform.translation
             q = trans.transform.rotation
 
-            # Convertimos a matriz homogenea la transformada de link_5 a la base
             T_base_ee = tf_conversions.transformations.quaternion_matrix([q.x, q.y, q.z, q.w])
             T_base_ee[0:3, 3] = [t.x, t.y, t.z]
 
-            """Cadena cinematica completa: camara -> link_5 -> base"""
-            # Calculamos la transformada completa de la camara a la base
             T_base_cam = T_base_ee @ self.T_cam2ee
 
-            # Punto en coordenadas de la camara (homogeneo)
             p_cam = np.array([msg.point.x, msg.point.y, msg.point.z, 1.0])
-
-            # Transformar al sistema de referencia de la base
             p_base = T_base_cam @ p_cam
 
-            z_ee_base    = trans.transform.translation.z  # TF
-            z_cam_objeto = msg.point.z                    # SAM3
-            Z_EE_CAM     = 0.05                           # medido físicamente (cam a ee)
-
-            # Cámara respecto a base
-            z_cam_base = z_ee_base + Z_EE_CAM
-
-            # Objeto respecto a base
-            z_objeto_base = z_cam_base - z_cam_objeto
-
-            # Offset de agarre
-            OFFSET_AGARRE = 0.18 
-            z_final = z_objeto_base + OFFSET_AGARRE
-
-            # Publicar punto transformado
             out                 = PointStamped()
             out.header.stamp    = rospy.Time.now()
             out.header.frame_id = self.base_frame
             out.point.x         = p_base[0]
             out.point.y         = p_base[1]
-            out.point.z         = z_final
+            out.point.z         = t.z 
             self.pub.publish(out)
+            self.pub.publish(Float64(p_base[2]))
 
             rospy.loginfo_throttle(2,
-                f"p_base -> X:{p_base[0]:.3f} Y:{p_base[1]:.3f} Z:{z_final:.3f}")
+                f"p_base -> X:{p_base[0]:.3f} Y:{p_base[1]:.3f} Z:{t.z:.3f} (fijo)")
 
         except Exception as e:
             rospy.logwarn(f"Error en transformacion: {e}")
-
 
 if __name__ == '__main__':
     KinovaTransformer()
