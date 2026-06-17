@@ -83,7 +83,7 @@ class KinovaTransformer:
 
             z_ee_base    = trans.transform.translation.z  # TF
             z_cam_objeto = msg.point.z                    # SAM3
-            Z_EE_CAM     = 0.05                           # medido físicamente (cam a ee)
+            Z_EE_CAM     = 0.1                         # medido físicamente (cam a ee)
 
             # Cámara respecto a base
             z_cam_base = z_ee_base + Z_EE_CAM
@@ -92,7 +92,7 @@ class KinovaTransformer:
             z_objeto_base = z_cam_base - z_cam_objeto
 
             # Offset de agarre
-            OFFSET_AGARRE = 0.18 
+            OFFSET_AGARRE = 0
             z_final = z_objeto_base + OFFSET_AGARRE
 
             # Publicar punto transformado
