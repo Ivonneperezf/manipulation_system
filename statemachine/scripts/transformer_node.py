@@ -98,7 +98,7 @@ class KinovaTransformer:
             self.pub.publish(out)
 
             rospy.loginfo_throttle(2,
-                f"p_base -> X:{p_base[0]:.3f} Y:{p_base[1]:.3f} Z:{p_base[2]:.3f}")
+                f"p_base -> X:{p_base[0]:.3f} Y:{p_base[1]:.3f} Z:{p_base[2] + self.OFFSET:.3f}")
 
         except Exception as e:
             rospy.logwarn(f"Error en transformacion: {e}")
