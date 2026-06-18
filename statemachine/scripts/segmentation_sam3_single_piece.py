@@ -158,10 +158,17 @@ class KinovaVisionSAM3:
         self._tmp_dir = tempfile.mkdtemp(prefix="sam3_ros_")
         self._tmp_frame_path = os.path.join(self._tmp_dir, "current_frame.jpg")
 
+        # Variables
+        self.should_segment = False
+
         # Suscriptores para RGB y nube de puntos
+        rospy.Subscriber("/segmentation_flag", std_msgs.msg.Bool, self.flag_cb, queue_size=1)
         rospy.Subscriber(self.TOPIC_RGB,    Image,        self.rgb_cb,   queue_size=1, buff_size=2**24)
         rospy.Subscriber(self.TOPIC_POINTS, PointCloud2,  self.cloud_cb, queue_size=1)
         rospy.loginfo("Nodo SAM3 Listo.")
+
+    def flag_cb(self, msg: std_msgs.msg.Bool) -> None:
+        self.should_segment = msg.data
 
     # Callback para recibir la nube de puntos y almacenarla en self.last_cloud
     def cloud_cb(self, msg: PointCloud2) -> None:
@@ -173,6 +180,8 @@ class KinovaVisionSAM3:
     def rgb_cb(self, msg: Image) -> None:
         # Si ya estamos procesando un frame, ignoramos este nuevo mensaje para evitar solapamientos
         if self.is_processing:
+            return
+        if not self.should_segment:
             return
         # Filtramos errores e indicamos el procesamiento en caso de que no existe un procesamiento concurrente
         try:

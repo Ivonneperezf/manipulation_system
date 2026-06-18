@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-# POR EL MOMENTO LA MAQUINA DE ESTADOS SE QUEDA HASTA AQUI
-
 import rospy
 import smach
 from geometry_msgs.msg import PointStamped
@@ -9,7 +7,7 @@ from std_msgs.msg import Float64MultiArray, String, Bool
 
 SLEEP = 2.0
 
-# Estado HOME
+"""Estado HOME"""
 class Home(smach.State):
     def __init__(self):
         # Transiciones posibles -> Done: movimiento completado, Failed: movimiento fallido
@@ -20,17 +18,19 @@ class Home(smach.State):
         self.joint_position = rospy.Publisher('/joint_goal', Float64MultiArray, queue_size=10)
 
         # Parametro para usar pose de simulacion o real
-        self.use_sim = rospy.get_param('~use_sim', True)
+        self.use_sim = rospy.get_param('~use_sim', False)
 
         # Definicion de pose HOME cartesiana
-        self.home_pose = PointStamped()
-        self.home_pose.point.x = -2.943
-        self.home_pose.point.y = -0.027
-        self.home_pose.point.z = -2.638
+        # self.home_pose = PointStamped()
+        # self.home_pose.point.x = -2.943
+        # self.home_pose.point.y = -0.027
+        # self.home_pose.point.z = -2.638
 
         # Definición de pose HOME articular (en radianes)
+        # Simulacion
         self.home_joint_goal_simulation = Float64MultiArray()
         self.home_joint_goal_simulation.data = [-3.1917, 3.8806, 2.9837, -1.4455, 3.1411, -2.4153]
+        # Brazo real
         self.home_joint_goal = Float64MultiArray()
         self.home_joint_goal.data = [4.544290785011106, 3.400400246220348, 2.1462572351452898, 5.563524612129654, 2.070292828737706, 8.390330026975427]
 
@@ -43,10 +43,8 @@ class Home(smach.State):
             # Si el nodo esta apagado retorna error
             if rospy.is_shutdown(): return 'Failed'
         
-        if self.use_sim:
-            self.joint_position.publish(self.home_joint_goal_simulation)
-        else:
-            self.joint_position.publish(self.home_joint_goal)
+        # Enviamos la pose de movimiento
+        self.joint_position.publish(self.home_joint_goal_simulation if self.use_sim else self.home_joint_goal)
 
         # Esperamos el mensaje de confirmacion de movimiento
         status_msg = rospy.wait_for_message('/motion_done', String)
@@ -56,7 +54,7 @@ class Home(smach.State):
         else:
             return 'Failed'
 
-# Estado ESPERAR_PUNTO
+"""Estado ESPERAR_PUNTO"""
 class Esperar_Punto(smach.State):
     def __init__ (self):
         # Bandera para indicar que debe iniciar la segmentacion
@@ -72,10 +70,11 @@ class Esperar_Punto(smach.State):
         # Esperamos el centroide del objeto detectado en el tópico correspondiente
         point_robot = rospy.wait_for_message('/object_centroid_robot', PointStamped)
         userdata.point_received = point_robot
-        rospy.sleep(SLEEP)
         self.segmentation_flag.publish(Bool(data=False))
+        rospy.sleep(SLEEP)
         return 'received_point'
-    
+
+"""Estado MOVER_A_PUNTO"""
 class Mover_A_Punto(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['Done', 'Failed'],
@@ -110,10 +109,8 @@ def main():
     # Estados y transiciones
     with sm:
         # Estado HOME
-        #smach.StateMachine.add('HOME', Home(), 
-        #                       transitions={'Done':'ESPERAR_PUNTO', 'Failed':'HOME'})
         smach.StateMachine.add('HOME', Home(), 
-                               transitions={'Done':'ESPERAR_PUNTO', 'Failed':'ESPERAR_PUNTO'})
+                               transitions={'Done':'ESPERAR_PUNTO', 'Failed':'HOME'})
 
         # Estado ESPERAR_PUNTO
         smach.StateMachine.add('ESPERAR_PUNTO', Esperar_Punto(), 
