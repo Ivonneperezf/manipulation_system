@@ -56,6 +56,7 @@ class KinovaTransformer:
 
         """Variables"""
         self.OFFSET = 0.18
+        #self.OFFSET = 0.0
 
         rospy.loginfo("Nodo listo. Esperando puntos en /object_centroid...")
 
@@ -94,11 +95,11 @@ class KinovaTransformer:
             out.header.frame_id = self.base_frame
             out.point.x         = p_base[0]
             out.point.y         = p_base[1]
-            out.point.z         = p_base[2] + self.OFFSET
+            out.point.z         = self.OFFSET - p_base[2]
             self.pub.publish(out)
 
             rospy.loginfo_throttle(2,
-                f"p_base -> X:{p_base[0]:.3f} Y:{p_base[1]:.3f} Z:{p_base[2] + self.OFFSET:.3f}")
+                f"Punto inicial -> X:{msg.point.x:.3f} Y:{msg.point.y:.3f} Z:{msg.point.z:.3f}\np_base -> X:{p_base[0]:.3f} Y:{p_base[1]:.3f} Z:{p_base[2]:.3f}")
 
         except Exception as e:
             rospy.logwarn(f"Error en transformacion: {e}")

@@ -32,7 +32,7 @@ class Home(smach.State):
         self.home_joint_goal_simulation.data = [-3.1917, 3.8806, 2.9837, -1.4455, 3.1411, -2.4153]
         # Brazo real
         self.home_joint_goal = Float64MultiArray()
-        self.home_joint_goal.data = [4.544290785011106, 3.400400246220348, 2.1462572351452898, 5.563524612129654, 2.070292828737706, 8.390330026975427]
+        self.home_joint_goal.data = [4.541823099945039, 3.4065382999007623, 2.1414848504718673, 5.56464793347745, 2.066487304698037, 6.870205666241469]
 
     def execute(self, userdata):
         rospy.loginfo("Ejecutando estado: HOME")
