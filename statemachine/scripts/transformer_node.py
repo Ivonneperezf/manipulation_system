@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 """
-Nodo que transforma puntos 3D detectados por la camara al sistema
-de referencia de la base del brazo robotico.
-
 Cadena cinematica aplicada:
     p_base = T_base_ee @ T_ee_cam @ p_cam
 
@@ -54,10 +51,6 @@ class KinovaTransformer:
         rospy.Subscriber('/object_centroid', PointStamped, self.callback)
         self.pub = rospy.Publisher('/object_centroid_robot', PointStamped, queue_size=10)
 
-        """Variables"""
-        self.OFFSET = 0.18
-        #self.OFFSET = 0.0
-
         rospy.loginfo("Nodo listo. Esperando puntos en /object_centroid...")
 
 
@@ -95,7 +88,7 @@ class KinovaTransformer:
             out.header.frame_id = self.base_frame
             out.point.x         = p_base[0]
             out.point.y         = p_base[1]
-            out.point.z         = self.OFFSET - p_base[2]
+            out.point.z         = p_base[2]
             self.pub.publish(out)
 
             rospy.loginfo_throttle(2,

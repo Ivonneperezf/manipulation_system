@@ -12,4 +12,11 @@
         <param name="unit" value="mq"/>
         <param name="verbose" value="false"/>
     </node>
+
+    <node name="telemetryNode"
+          pkg="statemachine"
+          type="estado_actual.py"
+          output="screen">
+          <param name="kinova_robotType" value="m1n6s300"/>
+    </node>
 </launch>
