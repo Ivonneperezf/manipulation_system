@@ -6,7 +6,9 @@ from geometry_msgs.msg import PointStamped
 from std_msgs.msg import Float64MultiArray, String, Bool
 
 SLEEP = 2.0
-OFFSET = 0.15  # Distancia a subir o bajar en Z para evitar colisiones con el objeto
+TENEDOR = 0.19 
+OFFSET_Z = 0.02 # Distancia a subir o bajar en Z para evitar colisiones con el objeto
+OFFSET = TENEDOR+ OFFSET_Z
 
 """
 ==========================================================================
@@ -127,15 +129,15 @@ class Mover_A_Centroide(smach.State):
         new_point.header = userdata.transform_point.header
         new_point.point = userdata.transform_point.point
         new_point.point.z = new_point.point.z + OFFSET
-        rospy.loginfo(f"Punto centroide: X:{new_point.point.x:.3f} Y:{new_point.point.y:.3f} Z:{new_point.point.z:.3f}")
+        rospy.loginfo(f"Punto a mover centroide: X:{new_point.point.x:.3f} Y:{new_point.point.y:.3f} Z:{new_point.point.z:.3f}")
         # Se envia el punto recibido del centro del objeto al nodo de movimiento
         self.cartesian_point.publish(new_point)
 
         # Esperamos a que se reciba la confirmacion de movimiento
         status_msg = rospy.wait_for_message('/motion_done', String)
         rospy.loginfo(f"============\nStatus: {status_msg}\n============")
-        #rospy.sleep(SLEEP)
-        rospy.sleep(10)
+        rospy.sleep(SLEEP)
+        #rospy.sleep(10)
         if status_msg.data == "DONE":
             return 'Done'
         else:
@@ -163,11 +165,13 @@ class Bajar_En_Z(smach.State):
         # Definimos el nuevo punto a mover, bajando en Z
         actual_point = rospy.wait_for_message('/kinova_current_cartesian', Float64MultiArray)
         new_point = PointStamped()
-        new_point.header = actual_point.header
+        new_point.header.stamp = rospy.Time.now()
+        new_point.header.frame_id = "m1n6s300_link_base"
         new_point.point.x = actual_point.data[0]
         new_point.point.y = actual_point.data[1]
-        new_point.point.z = actual_point.data[2] - OFFSET
-
+        new_point.point.z = actual_point.data[2] - OFFSET_Z
+        rospy.loginfo(f"Punto a mover bajada en Z: X:{new_point.point.x:.3f} Y:{new_point.point.y:.3f} Z:{new_point.point.z:.3f}")
+        #rospy.sleep(10)
         # Se envia el punto recibido del centro del objeto al nodo de movimiento
         self.cartesian_point.publish(new_point)
 
@@ -202,11 +206,13 @@ class Subir_En_Z(smach.State):
         # Definimos el nuevo punto a mover, subiendo en Z
         actual_point = rospy.wait_for_message('/kinova_current_cartesian', Float64MultiArray)
         new_point = PointStamped()
-        new_point.header = actual_point.header
+        new_point.header.stamp = rospy.Time.now()
+        new_point.header.frame_id = "m1n6s300_link_base"
         new_point.point.x = actual_point.data[0]
         new_point.point.y = actual_point.data[1]
-        new_point.point.z = actual_point.data[2] + OFFSET  # Subimos la distancia definida en OFFSET
+        new_point.point.z = actual_point.data[2] + OFFSET_Z  # Subimos la distancia definida en OFFSET_Z
 
+        rospy.loginfo(f"Punto a mover subida en Z: X:{new_point.point.x:.3f} Y:{new_point.point.y:.3f} Z:{new_point.point.z:.3f}")
         # Se envia el punto recibido del centro del objeto al nodo de movimiento
         self.cartesian_point.publish(new_point)
 
