@@ -31,7 +31,7 @@ class MaskFilter:
                         ser candidato a "contenedora"
     """
     # Constructor con parámetros ajustados para cubitos individuales
-    def __init__(self, min_area=100, max_area_ratio=0.06, min_compactness=0.10, containment_thresh=0.92, size_ratio_min=3.0):
+    def __init__(self, min_area=100, max_area_ratio=0.04, min_compactness=0.10, containment_thresh=0.92, size_ratio_min=3.0):
         self.min_area = min_area
         self.max_area_ratio = max_area_ratio
         self.min_compactness = min_compactness
@@ -112,7 +112,7 @@ class KinovaVisionSAM3:
         # Filtros ajustados para cubitos individuales de la clase definida anteriormente
         self.mask_filter = MaskFilter(
             min_area=100,
-            max_area_ratio=0.06,
+            max_area_ratio=0.04,
             min_compactness=0.10,
             containment_thresh=0.92,
             size_ratio_min=3.0,
@@ -392,13 +392,14 @@ class KinovaVisionSAM3:
         cv2.circle(frame_bgr, (u, v), 8, (0, 0, 255), -1)
         cv2.putText(
             frame_bgr,
-            f"{mode_label}: {obj_name} ({x_c:.3f}, {y_c:.3f}, {z_m:.3f})",
+            f"({x_c:.3f}, {y_c:.3f}, {z_m:.3f})",
             (u + 10, v),
             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2,
         )
 
         # Publicar centroide y mostrar
         self._publish_centroid(x_c, y_c, z_m)
+        rospy.loginfo(f"Publicado {x_c}, {y_c}, {z_m}")
 
         # Publicacion de nube de puntos de la mascara segmentada seleccionada en color magenta
         r, g, b = 255, 0, 255

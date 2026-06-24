@@ -141,7 +141,7 @@ class KinovaVisionD415:
         frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
 
         # Definimos las clases de interes
-        clases_interes = [0, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
+        clases_interes = [41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55]
 
         # Redimensionamos la imagen para YOLO y calculamos los factores de escala
         input_size = 320
