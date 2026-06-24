@@ -61,7 +61,6 @@ class Esperar_Punto(smach.State):
     def __init__ (self):
         # Definimos entradas y salidas del estado
         smach.State.__init__(self, outcomes=['received_point'],
-                             input_keys=['point_received'],
                              output_keys=['point_received']) 
         # Bandera para indicar que debe iniciar la segmentacion
         self.segmentation_flag = rospy.Publisher('/segmentation_flag', Bool, queue_size=10)
@@ -72,8 +71,8 @@ class Esperar_Punto(smach.State):
         # Indica segmentacion activa
         self.segmentation_flag.publish(Bool(data=True))
         # Esperamos el centroide del objeto detectado en el tópico correspondiente
-        point_robot = rospy.wait_for_message('/object_centroid_sm', PointStamped)
-        userdata.point_received = point_robot
+        point = rospy.wait_for_message('/object_centroid', PointStamped)
+        userdata.point_received = point
         # Indica segmentacion inactiva
         self.segmentation_flag.publish(Bool(data=False))
         return 'received_point'
@@ -89,10 +88,14 @@ class Transformar_Punto(smach.State):
         smach.State.__init__(self, outcomes=['received_point'],
                              input_keys=['point'],
                              output_keys=['point_received']) 
+        point_pub = rospy.Publisher('/object_centroid_sm', PointStamped, queue_size=10)
     
     def execute(self, userdata):
         # Publicamos la bandera para iniciar la segmentacion para que se comience la segmentacion
         rospy.loginfo("Ejecutando estado: TRANSFORMAR_PUNTO")
+        # Publicamos el centroide
+        point_pub = rospy.Publisher('/object_centroid_sm', PointStamped, queue_size=10)
+        point_pub.publish(userdata.point)
         # Esperamos a que se realice la transformacion
         point_robot = rospy.wait_for_message('/object_centroid_robot', PointStamped)
         userdata.point_received = point_robot
