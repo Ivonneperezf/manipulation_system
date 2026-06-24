@@ -72,10 +72,30 @@ class Esperar_Punto(smach.State):
         # Indica segmentacion activa
         self.segmentation_flag.publish(Bool(data=True))
         # Esperamos el centroide del objeto detectado en el tópico correspondiente
-        point_robot = rospy.wait_for_message('/object_centroid_robot', PointStamped)
+        point_robot = rospy.wait_for_message('/object_centroid_sm', PointStamped)
         userdata.point_received = point_robot
         # Indica segmentacion inactiva
         self.segmentation_flag.publish(Bool(data=False))
+        return 'received_point'
+
+"""
+==========================================================================
+Estado TRANSFORMAR_PUNTO
+==========================================================================
+"""
+class Transformar_Punto(smach.State):
+    def __init__ (self):
+        # Definimos entradas y salidas del estado
+        smach.State.__init__(self, outcomes=['received_point'],
+                             input_keys=['point'],
+                             output_keys=['point_received']) 
+    
+    def execute(self, userdata):
+        # Publicamos la bandera para iniciar la segmentacion para que se comience la segmentacion
+        rospy.loginfo("Ejecutando estado: TRANSFORMAR_PUNTO")
+        # Esperamos a que se realice la transformacion
+        point_robot = rospy.wait_for_message('/object_centroid_robot', PointStamped)
+        userdata.point_received = point_robot
         rospy.sleep(SLEEP)
         return 'received_point'
 
@@ -242,14 +262,19 @@ def main():
 
         # Estado ESPERAR_PUNTO
         smach.StateMachine.add('ESPERAR_PUNTO', Esperar_Punto(), 
+                               transitions={'received_point':'TRANSFORMAR_PUNTO'},
+                               remapping={'point_received':'shared_point'}) # Punto del centroide
+        
+        # Estado TRANSFORMAR_PUNTO
+        smach.StateMachine.add('TRANSFORMAR_PUNTO', Transformar_Punto(),
                                transitions={'received_point':'MOVER_A_CENTROIDE'},
-                               remapping={'point_received':'shared_point'}) 
-
+                               remapping={'point':'shared_point', 'point_received':'transformed_point'})
+                               #                Punto de centroide     Punto transformado
         # Estado MOVER_A_CENTROIDE
         smach.StateMachine.add('MOVER_A_CENTROIDE', Mover_A_Centroide(), 
                                transitions={'Done':'BAJAR_EN_Z', 'Failed':'HOME'},
-                               remapping={'point_to_move':'shared_point'})
-        
+                               remapping={'point_to_move':'transformed_point'})
+                               #               Punto transformado
         # Estado BAJAR_EN_Z
         smach.StateMachine.add('BAJAR_EN_Z', Bajar_En_Z(),
                                transitions={'Done':'SUBIR_EN_Z', 'Failed':'HOME'})

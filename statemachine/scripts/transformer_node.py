@@ -48,7 +48,7 @@ class KinovaTransformer:
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
         """SUSCRIPTORES Y PUBLICADORES"""
-        rospy.Subscriber('/object_centroid', PointStamped, self.callback)
+        rospy.Subscriber('/object_centroid_sm', PointStamped, self.callback)
         self.pub = rospy.Publisher('/object_centroid_robot', PointStamped, queue_size=10)
 
         rospy.loginfo("Nodo listo. Esperando puntos en /object_centroid...")
