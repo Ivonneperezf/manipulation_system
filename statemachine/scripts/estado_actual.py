@@ -2,14 +2,9 @@
 
 import roslib; roslib.load_manifest('kinova_demo')
 import rospy
-import sys
-import actionlib
 import kinova_msgs.msg
-import std_msgs.msg
-import geometry_msgs.msg
-import math
 from geometry_msgs.msg import PointStamped
-from std_msgs.msg import Float64MultiArray, String
+from std_msgs.msg import Float64MultiArray
 
 class KinovaTelemetryNode:
 
@@ -71,5 +66,9 @@ def main():
     try:
         telemetry = KinovaTelemetryNode()
         telemetry.start_publishing(frequency=10)
+        rospy.spin()
     except rospy.ROSInterruptException:
         rospy.loginfo("Nodo de telemetria Kinova interrumpido.")
+
+if __name__ == '__main__':
+    main()
