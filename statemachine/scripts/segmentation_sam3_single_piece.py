@@ -181,8 +181,6 @@ class KinovaVisionSAM3:
         # Si ya estamos procesando un frame, ignoramos este nuevo mensaje para evitar solapamientos
         if self.is_processing:
             return
-        if not self.should_segment:
-            return
         # Filtramos errores e indicamos el procesamiento en caso de que no existe un procesamiento concurrente
         try:
             self.is_processing = True

@@ -37,7 +37,7 @@ class HandEyeCalibration:
         """VARIABLES DE CALIBRACION"""
         # Parametro para controlar la captura de poses, se activa al presionar Enter
         self.ready_to_capture = False
-        self.size = 0.045 # Tamaño del marcador del ArUco
+        self.size = 0.108 # Tamaño del marcador del ArUco
         self.quat = None # Variable para almacenar la orientacion en cuaterniones de la transformada resultante
         # Listas para almacenar coordenadas y posiciones del EE a la base 
         self.R_gripper2base = []
