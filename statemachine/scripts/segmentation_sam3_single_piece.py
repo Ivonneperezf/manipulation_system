@@ -229,10 +229,7 @@ class KinovaVisionSAM3:
         """
         n = len(all_clean_masks)
         centroids_uv = []
-        # Si solo hay una mascara
-        if n == 1:
-            u, v = centroids_uv[0]
-            return 0, int(u), int(v)
+        
         # Centroides en píxeles
         centroids_uv = []
         for mask_bool in all_clean_masks:
@@ -247,6 +244,12 @@ class KinovaVisionSAM3:
             u = M["m10"] / M["m00"] * img_w / mask_w
             v = M["m01"] / M["m00"] * img_h / mask_h
             centroids_uv.append((u, v))
+        
+        # Si solo hay una mascara
+        if n == 1:
+            u, v = centroids_uv[0]
+            return 0, int(u), int(v)
+        
         # Calculamos el centro del grupo de cubitos y la distancia de cada centroide a ese centro para la selección adaptativa
         centroids_arr = np.array(centroids_uv)      # (N, 2)
         group_center  = centroids_arr.mean(axis=0)  # (u_mean, v_mean)
