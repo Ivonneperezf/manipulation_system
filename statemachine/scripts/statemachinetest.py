@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import math
 import rospy
 import smach
 from geometry_msgs.msg import PointStamped
@@ -182,6 +183,42 @@ class Bajar_En_Z(smach.State):
             return 'Done'
         else:
             return 'Failed'
+
+"""
+==========================================================================
+Estado GIRAR
+==========================================================================
+"""
+class Girar(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['Done', 'Failed']) 
+        # Nodo publicador en el tópico de movimiento
+        self.joint_position = rospy.Publisher('/joint_goal', Float64MultiArray, queue_size=10)
+
+    def execute(self, userdata):
+        rospy.loginfo("Ejecutando estado: GIRAR")
+        # Espera 0.1 segundos hasta que haya al menos un suscriptor conectado al topico
+        while self.joint_position.get_num_connections() == 0:
+            rospy.sleep(0.1)
+            # Si el nodo esta apagado retorna error
+            if rospy.is_shutdown(): return 'Failed'
+        # Definimos la pose articular actual
+        actual_pose = rospy.wait_for_message('/kinova_current_joints', Float64MultiArray)
+        # Definimos la nueva pose articular, girando la articulacion 5 pi/6
+        new_pose = Float64MultiArray()
+        new_pose.data = list(actual_pose.data)
+        new_pose.data[4] = new_pose.data[4] - 0.1 #(math.pi)/6.0
+        rospy.loginfo(f"Pose articular actual: {actual_pose.data}")
+        self.joint_position.publish(new_pose)
+
+        # Esperamos el mensaje de confirmacion de movimiento
+        status_msg = rospy.wait_for_message('/motion_done', String)
+        rospy.sleep(SLEEP)
+        if status_msg.data == "DONE":
+            return 'Done'
+        else:
+            return 'Failed'
+
     
 """
 ==========================================================================
@@ -289,6 +326,10 @@ def main():
                                #               Punto transformado
         # Estado BAJAR_EN_Z
         smach.StateMachine.add('BAJAR_EN_Z', Bajar_En_Z(),
+                               transitions={'Done':'GIRAR', 'Failed':'HOME'})
+        
+        # Estado GIRAR
+        smach.StateMachine.add('GIRAR', Girar(),
                                transitions={'Done':'SUBIR_EN_Z', 'Failed':'HOME'})
         
         # Estado SUBIR_EN_Z
