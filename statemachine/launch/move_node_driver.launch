@@ -1,8 +1,5 @@
 <?xml version="1.0"?>
-<!-- Nodo de lanzamiento para el nodo de movimiento del robot Kinova. 
- Este nodo se encargará de recibir las coordenadas objetivo y enviar los comandos 
- necesarios al robot para alcanzar esa posición. Se pueden configurar parámetros como 
- el tipo de robot, la unidad de medida y el nivel de verbosidad a través de los parámetros del nodo. -->
+<!-- Nodo de lanzamiento para el nodo de movimiento del robot Kinova -->
 <launch>
     <node name="kinova_move"
           pkg="statemachine"
