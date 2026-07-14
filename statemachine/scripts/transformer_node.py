@@ -90,6 +90,7 @@ class KinovaTransformer:
             out.point.x         = p_base[0]
             out.point.y         = p_base[1]
             out.point.z         = p_base[2]
+            rospy.sleep(4)
             self.pub.publish(out)
 
             rospy.loginfo_throttle(2,
