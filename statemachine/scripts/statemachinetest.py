@@ -256,7 +256,7 @@ class Alimentar(smach.State):
 
         # Esperamos el mensaje de confirmacion de movimiento
         status_msg = rospy.wait_for_message('/motion_done', String)
-        rospy.sleep(2)
+        rospy.sleep(5)
         if status_msg.data == "DONE":
             return 'Done'
         else:
