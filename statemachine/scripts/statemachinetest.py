@@ -5,9 +5,9 @@ import smach
 from geometry_msgs.msg import PointStamped
 from std_msgs.msg import Float64MultiArray, String, Bool
 
-SLEEP = 2.0
-TENEDOR = 0.19 
-OFFSET_Z = 0.02 # Distancia a subir o bajar en Z para evitar colisiones con el objeto
+SLEEP = 6.0
+TENEDOR = 0.13
+OFFSET_Z = 0.05 # Distancia a subir o bajar en Z para evitar colisiones con el objeto
 OFFSET = TENEDOR+ OFFSET_Z
 
 """
@@ -33,7 +33,7 @@ class Home(smach.State):
         self.home_joint_goal_simulation.data = [-3.1917, 3.8806, 2.9837, -1.4455, 3.1411, -2.4153]
         """Brazo real"""
         self.home_joint_goal = Float64MultiArray()
-        self.home_joint_goal.data = [3.7831761233813275, 3.5020914545483697, 2.146141254479817, 5.598007221923999, 2.1490086800255046, 6.840006484744405]
+        self.home_joint_goal.data = [4.368214025327754, 3.617058520910436, 2.2687591831795175, 5.649283725552385, 2.0857627320358127, 7.0008326524454185]
 
     def execute(self, userdata):
         rospy.loginfo("Ejecutando estado: HOME")
@@ -48,7 +48,7 @@ class Home(smach.State):
 
         # Esperamos el mensaje de confirmacion de movimiento
         status_msg = rospy.wait_for_message('/motion_done', String)
-        rospy.sleep(SLEEP)
+        rospy.sleep(6)
         if status_msg.data == "DONE":
             return 'Done'
         else:
@@ -73,6 +73,7 @@ class Esperar_Punto(smach.State):
         # Indica segmentacion activa
         #self.segmentation_flag.publish(Bool(data=True))
         # Esperamos el centroide del objeto detectado en el tópico correspondiente
+        rospy.sleep(5)
         point = rospy.wait_for_message('/object_centroid', PointStamped)
         userdata.point = point
         rospy.loginfo(f"Punto recibido x={point.point.x:.3f} y={point.point.y:.3f} z={point.point.z:.3f}")
@@ -100,9 +101,9 @@ class Transformar_Punto(smach.State):
         self.point_pub.publish(userdata.point)
         # Esperamos a que se realice la transformacion
         point_robot = rospy.wait_for_message('/object_centroid_robot', PointStamped)
-        rospy.loginfo(f"Punto recibido x={point_robot.point.x:.3f} y={point_robot.point.y:.3f} z={point_robot.point.z:.3f}")
+        rospy.loginfo(f"Punto a mover x={point_robot.point.x:.3f} y={point_robot.point.y:.3f} z={point_robot.point.z:.3f}")
         userdata.transform_point = point_robot
-        rospy.sleep(SLEEP)
+        rospy.sleep(2)
         return 'received_point'
 
 """
@@ -130,13 +131,14 @@ class Mover_A_Centroide(smach.State):
         new_point.point = userdata.transform_point.point
         new_point.point.z = new_point.point.z + OFFSET
         rospy.loginfo(f"Punto a mover centroide: X:{new_point.point.x:.3f} Y:{new_point.point.y:.3f} Z:{new_point.point.z:.3f}")
+        rospy.sleep(10)
         # Se envia el punto recibido del centro del objeto al nodo de movimiento
         self.cartesian_point.publish(new_point)
 
         # Esperamos a que se reciba la confirmacion de movimiento
         status_msg = rospy.wait_for_message('/motion_done', String)
         rospy.loginfo(f"============\nStatus: {status_msg}\n============")
-        rospy.sleep(SLEEP)
+        rospy.sleep(2)
         #rospy.sleep(10)
         if status_msg.data == "DONE":
             return 'Done'
@@ -177,7 +179,7 @@ class Bajar_En_Z(smach.State):
 
         # Esperamos a que se reciba la confirmacion de movimiento
         status_msg = rospy.wait_for_message('/motion_done', String)
-        rospy.sleep(SLEEP)
+        rospy.sleep(2)
         if status_msg.data == "DONE":
             return 'Done'
         else:
@@ -218,7 +220,7 @@ class Subir_En_Z(smach.State):
 
         # Esperamos a que se reciba la confirmacion de movimiento
         status_msg = rospy.wait_for_message('/motion_done', String)
-        rospy.sleep(SLEEP)
+        rospy.sleep(2)
         if status_msg.data == "DONE":
             return 'Done'
         else:
@@ -254,7 +256,7 @@ class Alimentar(smach.State):
 
         # Esperamos el mensaje de confirmacion de movimiento
         status_msg = rospy.wait_for_message('/motion_done', String)
-        rospy.sleep(SLEEP)
+        rospy.sleep(2)
         if status_msg.data == "DONE":
             return 'Done'
         else:
