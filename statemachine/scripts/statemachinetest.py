@@ -6,7 +6,7 @@ from geometry_msgs.msg import PointStamped
 from std_msgs.msg import Float64MultiArray, String, Bool
 
 SLEEP = 6.0
-TENEDOR = 0.13
+TENEDOR = 0.1
 OFFSET_Z = 0.05 # Distancia a subir o bajar en Z para evitar colisiones con el objeto
 OFFSET = TENEDOR+ OFFSET_Z
 
