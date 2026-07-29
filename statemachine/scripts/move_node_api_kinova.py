@@ -8,20 +8,15 @@ import kinova_msgs.msg
 import std_msgs.msg
 import geometry_msgs.msg
 import math
-import argparse
 from geometry_msgs.msg import PointStamped
 from std_msgs.msg import Float64MultiArray, String
 
-"""==================================================================
-        ESTE CODIGO ES PROVISIONAL, NO DEFINIREMOS LA ROTACION
-    =================================================================="""
 class MoveNodeKinova():
     def __init__(self):
         # Cargamos los parametros necesarios
         self.kinova_robotType = rospy.get_param("~kinova_robotType", "m1n6s300")
         self.unit = rospy.get_param("~unit", "mq")
         self.verbose = rospy.get_param("~verbose", False)
-        #self.relative = rospy.get_param("~relative", False)
 
         # Cargamos los parametros del robot
         self.robot_category = self.kinova_robotType[0]
@@ -34,37 +29,38 @@ class MoveNodeKinova():
         self.finger_maxDist = 18.9/2/1000  # max distance for one finger in meter
         self.finger_maxTurn = 6800  # max thread turn for one finger
 
-        # Variable para alcenar la posicion actual del robot
+        # Variable para almacenar la posicion actual del robot
         self.currentJointCommand = [0.0]*7
         self.pose_value = []
         self.currentCartesianCommand = [0.0] * 7
+
         # Inicializamos el nodo 
         rospy.init_node('move_node_kinova')
-
         rospy.loginfo('Nodo iniciado, esperando comandos...')
 
         # Publishers
         self.status_pub = rospy.Publisher('/motion_done', String, queue_size=10)
 
-        # Recibimos punto para enviar al robot
+        # Subscribers
         rospy.Subscriber('/cartesian_goal', PointStamped, self._cartesian_callback)
         rospy.Subscriber('/joint_goal', Float64MultiArray, self._joint_callback)
 
-    # Callback para recibir el punto deseado y ejecutar el movimiento
-    # Siempre es en unidades de mq
+    # Callback para recibir el punto deseado y ejecutar el movimiento (Siempre es en unidades de mq)
     def _cartesian_callback(self, msg):
-        self.getcurrentCartesianCommand()  # Obtenemos la posición actual del robot antes de enviar el comando
+        # Obtenemos la posicion actual del robot antes de enviar el comando
+        self.getcurrentCartesianCommand()  
+        # Convertimos la orientación de Euler XYZ a Quaternion
         orientation_q = self.EulerXYZ2Quaternion(self.currentCartesianCommand[3:])
-        rospy.loginfo(f"orientacion {orientation_q}")
+        rospy.loginfo(f"Orientacion {orientation_q}")
+        # Manteniendo la orientacion actual del robot, enviamos el punto cartesiano deseado
         self.pose_value = [msg.point.x, msg.point.y, msg.point.z] + orientation_q
         rospy.loginfo(f"Pose enviada {self.pose_value}")
         try:
-
+            # Enviamos la pose
             poses = [float(n) for n in self.pose_value]
-
             result = self.cartesian_pose_client(poses[:3], poses[3:])
-
             rospy.loginfo('Cartesian pose sent!')
+            # Publicamos el resultado correspondiente
             self.status_pub.publish("DONE" if result else "FAILED")
 
         except rospy.ROSInterruptException:
@@ -76,19 +72,24 @@ class MoveNodeKinova():
         rospy.loginfo(f"Recibido mensaje en /joint_goal: {msg}")
         self.joint_goal = [float(n) for n in msg.data]
         rospy.loginfo(f"Recibido joint goal: {self.joint_goal}, ejecutando movimiento...")
-        self.getcurrentJointCommand()  # Obtenemos la posición actual del robot antes de enviar el comando
+        # Obtenemos la posición actual del robot antes de enviar el comando
+        self.getcurrentJointCommand()
+        # Parseamos a grados y a radianes
         joint_degree, joint_radian = self.unitParser("radian", self.joint_goal, False)
         positions = [0]*7
         try:
+            # Si no se definieron los grados de los arituclaciones, es decir la lista esta vacia
             if self.arm_joint_number < 1:
                 rospy.logerr('Joint number is 0, check with "-h" to see how to use this node.')
                 positions = []  # Get rid of static analysis warning that doesn't see the exit()
                 sys.exit() 
+            # Si no enviamos la posicion
             else:
                 for i in range(0,self.arm_joint_number):
                     positions[i] = joint_degree[i] 
             result = self.joint_angle_client(positions)
             rospy.loginfo('Joint angles sent!')
+            # Publicamos el resultado
             self.status_pub.publish("DONE" if result else "FAILED")
         except Exception as e:
             rospy.logerr(f"Error al ejecutar el movimiento: {e}")

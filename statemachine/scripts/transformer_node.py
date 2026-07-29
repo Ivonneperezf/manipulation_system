@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 """
-Nodo que transforma puntos 3D detectados por la camara al sistema
-de referencia de la base del brazo robotico.
-
 Cadena cinematica aplicada:
     p_base = T_base_ee @ T_ee_cam @ p_cam
 
@@ -48,7 +45,8 @@ class KinovaTransformer:
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
         """SUSCRIPTORES Y PUBLICADORES"""
-        rospy.Subscriber('/object_centroid', PointStamped, self.callback)
+        rospy.Subscriber('/object_centroid_sm', PointStamped, self.callback)
+        #rospy.Subscriber('/object_centroid', PointStamped, self.callback)
         self.pub = rospy.Publisher('/object_centroid_robot', PointStamped, queue_size=10)
 
         rospy.loginfo("Nodo listo. Esperando puntos en /object_centroid...")
@@ -101,11 +99,12 @@ class KinovaTransformer:
             out.header.frame_id = self.base_frame
             out.point.x         = p_base[0]
             out.point.y         = p_base[1]
-            out.point.z         = z_final
+            out.point.z         = p_base[2]
+            rospy.sleep(4)
             self.pub.publish(out)
 
             rospy.loginfo_throttle(2,
-                f"p_base -> X:{p_base[0]:.3f} Y:{p_base[1]:.3f} Z:{z_final:.3f}")
+                f"Punto inicial -> X:{msg.point.x:.3f} Y:{msg.point.y:.3f} Z:{msg.point.z:.3f}\np_base -> X:{p_base[0]:.3f} Y:{p_base[1]:.3f} Z:{p_base[2]:.3f}")
 
         except Exception as e:
             rospy.logwarn(f"Error en transformacion: {e}")

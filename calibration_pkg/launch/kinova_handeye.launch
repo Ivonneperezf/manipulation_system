@@ -1,6 +1,0 @@
-<launch>
-    <node pkg="calibration"
-          type="handeye-eye-calibration.py"
-          name="handeye_calibration_node"
-          output="screen"/>
-</launch>

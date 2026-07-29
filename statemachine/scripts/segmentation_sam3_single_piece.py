@@ -31,7 +31,7 @@ class MaskFilter:
                         ser candidato a "contenedora"
     """
     # Constructor con parámetros ajustados para cubitos individuales
-    def __init__(self, min_area=100, max_area_ratio=0.06, min_compactness=0.10, containment_thresh=0.92, size_ratio_min=3.0):
+    def __init__(self, min_area=100, max_area_ratio=0.04, min_compactness=0.10, containment_thresh=0.92, size_ratio_min=3.0):
         self.min_area = min_area
         self.max_area_ratio = max_area_ratio
         self.min_compactness = min_compactness
@@ -112,7 +112,7 @@ class KinovaVisionSAM3:
         # Filtros ajustados para cubitos individuales de la clase definida anteriormente
         self.mask_filter = MaskFilter(
             min_area=100,
-            max_area_ratio=0.06,
+            max_area_ratio=0.04,
             min_compactness=0.10,
             containment_thresh=0.92,
             size_ratio_min=3.0,
@@ -158,10 +158,17 @@ class KinovaVisionSAM3:
         self._tmp_dir = tempfile.mkdtemp(prefix="sam3_ros_")
         self._tmp_frame_path = os.path.join(self._tmp_dir, "current_frame.jpg")
 
+        # Variables
+        self.should_segment = False
+
         # Suscriptores para RGB y nube de puntos
+        rospy.Subscriber("/segmentation_flag", std_msgs.msg.Bool, self.flag_cb, queue_size=1)
         rospy.Subscriber(self.TOPIC_RGB,    Image,        self.rgb_cb,   queue_size=1, buff_size=2**24)
         rospy.Subscriber(self.TOPIC_POINTS, PointCloud2,  self.cloud_cb, queue_size=1)
         rospy.loginfo("Nodo SAM3 Listo.")
+
+    def flag_cb(self, msg: std_msgs.msg.Bool) -> None:
+        self.should_segment = msg.data
 
     # Callback para recibir la nube de puntos y almacenarla en self.last_cloud
     def cloud_cb(self, msg: PointCloud2) -> None:
@@ -222,10 +229,7 @@ class KinovaVisionSAM3:
         """
         n = len(all_clean_masks)
         centroids_uv = []
-        # Si solo hay una mascara
-        if n == 1:
-            u, v = centroids_uv[0]
-            return 0, int(u), int(v)
+        
         # Centroides en píxeles
         centroids_uv = []
         for mask_bool in all_clean_masks:
@@ -240,6 +244,12 @@ class KinovaVisionSAM3:
             u = M["m10"] / M["m00"] * img_w / mask_w
             v = M["m01"] / M["m00"] * img_h / mask_h
             centroids_uv.append((u, v))
+        
+        # Si solo hay una mascara
+        if n == 1:
+            u, v = centroids_uv[0]
+            return 0, int(u), int(v)
+        
         # Calculamos el centro del grupo de cubitos y la distancia de cada centroide a ese centro para la selección adaptativa
         centroids_arr = np.array(centroids_uv)      # (N, 2)
         group_center  = centroids_arr.mean(axis=0)  # (u_mean, v_mean)
@@ -383,13 +393,14 @@ class KinovaVisionSAM3:
         cv2.circle(frame_bgr, (u, v), 8, (0, 0, 255), -1)
         cv2.putText(
             frame_bgr,
-            f"{mode_label}: {obj_name} ({x_c:.3f}, {y_c:.3f}, {z_m:.3f})",
+            f"({x_c:.3f}, {y_c:.3f}, {z_m:.3f})",
             (u + 10, v),
             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2,
         )
 
         # Publicar centroide y mostrar
         self._publish_centroid(x_c, y_c, z_m)
+        rospy.loginfo(f"Publicado {x_c}, {y_c}, {z_m}")
 
         # Publicacion de nube de puntos de la mascara segmentada seleccionada en color magenta
         r, g, b = 255, 0, 255

@@ -2,7 +2,7 @@
 <launch>
 
   <arg name="py_path" default="python3"/>
-  <arg name="use_simulation_params" default="true"/>
+  <arg name="use_simulation_params" default="false"/>
 
   <node name="segmentation_node"
         pkg="statemachine"

@@ -37,7 +37,7 @@ class HandEyeCalibration:
         """VARIABLES DE CALIBRACION"""
         # Parametro para controlar la captura de poses, se activa al presionar Enter
         self.ready_to_capture = False
-        self.size = 0.045 # Tamaño del marcador del ArUco
+        self.size = 0.108 # Tamaño del marcador del ArUco
         self.quat = None # Variable para almacenar la orientacion en cuaterniones de la transformada resultante
         # Listas para almacenar coordenadas y posiciones del EE a la base 
         self.R_gripper2base = []
@@ -96,39 +96,29 @@ class HandEyeCalibration:
             corners, ids, rejected = self.detector.detectMarkers(gray)
 
             if ids is not None:
-                # Devuelve vector de rotacion y traslacion del marcador respecto a la camara para cada celda
+                # Devuelve vector de rotacion y traslacion del marcador respecto a la camara
                 rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(
                     corners, self.size, self.camera_matrix, self.dist_coeffs)
 
-                # Dibujar los marcadores detectados
+                # Dibujar todos los marcadores detectados para visualizacion
                 cv2.aruco.drawDetectedMarkers(cv_image, corners, ids)
                 for r, t in zip(rvec, tvec):
                     cv2.drawFrameAxes(cv_image, self.camera_matrix, self.dist_coeffs, r, t, self.size)
 
-                # Promediar sobre todos los marcadores detectados ---
-                R_matrices = []
-                t_vectors = []
+                # Usar SOLO el marcador con id=0 para la calibracion
+                ids_flat = ids.flatten()
+                target_id = 0
+                if target_id not in ids_flat:
+                    cv2.imshow("Camera View", cv_image)
+                    cv2.waitKey(1)
+                    return
 
-                # Convertir a matriz de rotacion y vector de traslacion
-                for r, t in zip(rvec, tvec):
-                    R, _ = cv2.Rodrigues(r)
-                    R_matrices.append(R)
-                    t_vectors.append(t.reshape(3, 1))
+                # Obtener indice del marcador id=0
+                idx = np.where(ids_flat == target_id)[0][0]
 
-                # Promedio de traslaciones (directo, es valido)
-                t_cam_marker = np.mean(t_vectors, axis=0)
-
-                # Promedio de rotaciones via SVD en SO(3)
-                R_sum = np.zeros((3, 3))
-                for R in R_matrices:
-                    R_sum += R
-                U, _, Vt = np.linalg.svd(R_sum / len(R_matrices))
-                R_cam_marker = U @ Vt  # Proyectar al grupo SO(3)
-
-                # Verificar que sea rotacion propia (det = +1, no reflexion)
-                if np.linalg.det(R_cam_marker) < 0:
-                    U[:, -1] *= -1
-                    R_cam_marker = U @ Vt
+                # Extraer R y t solo de ese marcador
+                R_cam_marker, _ = cv2.Rodrigues(rvec[idx])
+                t_cam_marker = tvec[idx].reshape(3, 1)
 
                 # Solo captura si el usuario presiono ENTER
                 if self.ready_to_capture:
@@ -141,7 +131,6 @@ class HandEyeCalibration:
 
         except Exception as e:
             print("Error deteccion:", e)
-
 
     # Funcion para capturar pose del robot
     def capture_pose(self, R_cam_marker, t_cam_marker):
